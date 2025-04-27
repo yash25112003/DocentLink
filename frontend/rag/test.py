@@ -1,4 +1,5 @@
-# --- Imports and Setup (Keep as before) ---
+# --- Imports and Setup (Keep as before) ---  9.2/10 latest and best till now
+
 import torch
 from qdrant_client import models
 from qdrant_client import QdrantClient, http # Import http for status codes
@@ -17,6 +18,7 @@ import uuid
 from qdrant_client.models import SearchParams
 import warnings
 import re # Import regex for cleaning
+import math # For ceiling division
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -27,32 +29,134 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # --- End Imports and Setup ---
 
 def batch_iterate(lst, batch_size):
+    """Iterate over a list in batches."""
     for i in range(0, len(lst), batch_size): yield lst[i : i + batch_size]
 
-def prepare_query(query): return query
+def prepare_query(query):
+    """Prepare query (placeholder for potential future enhancements)."""
+    return query
 
-# --- PDFProcessor Class (MODIFIED) ---
+# --- PDFProcessor Class (REVISED section headers) ---
 class PDFProcessor:
-    def __init__(self, model_name='all-MiniLM-L6-v2', chunk_strategy='paragraph'):
+    def __init__(self, model_name='all-mpnet-base-v2', chunk_strategy='smart_section'):
+        """Initialize with embedding model and chunking strategy."""
         self.text_model = SentenceTransformer(model_name)
         self.embedding_dim = self.text_model.get_sentence_embedding_dimension()
         self.chunk_strategy = chunk_strategy
+        # *** UPDATED Section Headers List ***
+        self.section_headers = [
+            "EDUCATION", "EXPERIENCE", "SKILLS", "PROJECTS", "CERTIFICATIONS",
+            "PUBLICATIONS", "AWARDS", "LANGUAGES", "INTERESTS", "SUMMARY", "OBJECTIVE",
+            "WORK EXPERIENCE", "PROFESSIONAL EXPERIENCE", "TECHNICAL SKILLS",
+            "EXTRACURRICULAR ACTIVITIES", "ACADEMIC PROJECTS AND PAPERS", # Added specific title
+            "COURSES AND CERTIFICATIONS", "CONTACT", "PERSONAL DETAILS",
+            "RESEARCH", "PUBLICATIONS AND PRESENTATIONS" # Added more variants
+        ]
         print(f"✅ PDFProcessor initialized with model: {model_name} (dim: {self.embedding_dim}), Chunk Strategy: {self.chunk_strategy}")
+        print(f"    Recognized Section Headers: {self.section_headers}")
 
-    def chunk_text_by_paragraph(self, text, page_num):
-        """Splits text into paragraphs, adding page context."""
-        # Split by double newline, then filter empty strings after stripping
-        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+    def clean_text(self, text):
+        """Clean and normalize text."""
+        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r'[•●○◦◘▪️▫️–-]', '• ', text)
+        text = re.sub(r'•\s+•\s+', '• ', text)
+        return text.strip()
+
+    def chunk_text_smart_section(self, text, page_num):
+        """Enhanced section-aware chunking."""
+        lines = text.split('\n')
         chunks = []
-        for i, para in enumerate(paragraphs):
-            # Simple heuristic: ignore very short paragraphs (likely list items handled separately or headers)
-            if len(para) > 50: # Adjust length threshold as needed
-                chunks.append({
-                    "text": f"[Page {page_num + 1}] {para}",
+        current_section = "Introduction"
+        current_chunk_lines = []
+        chunk_index_counter = 0
+
+        for line in lines:
+            cleaned_line = line.strip()
+            if not cleaned_line: continue
+
+            is_header = False
+            line_upper = cleaned_line.upper()
+            # More robust header check: must be mostly uppercase or match list exactly
+            if len(cleaned_line) < 50 and (line_upper == cleaned_line or cleaned_line in self.section_headers):
+                 # Check against known headers
+                 for header in self.section_headers:
+                     # Allow for minor trailing characters like ':'
+                     if re.fullmatch(rf"{re.escape(header)}\s*:?", line_upper):
+                         is_header = True
+                         current_section = header # Use the matched header from our list
+                         break
+
+            if is_header:
+                if current_chunk_lines:
+                    chunk_text = self.clean_text("\n".join(current_chunk_lines))
+                    # Save previous chunk only if it has content beyond just its header
+                    if chunk_text.upper() != current_section or len(current_chunk_lines) > 1:
+                         chunks.append({
+                            "text": f"[Page {page_num + 1}] [{current_section}]\n{chunk_text}",
+                            "page": page_num + 1,
+                            "chunk_index": chunk_index_counter,
+                            "section": current_section # Use the identified section
+                        })
+                         chunk_index_counter += 1
+                # Reset for new section, including the header line itself
+                current_section = header # Set the new section name
+                current_chunk_lines = [cleaned_line]
+            else:
+                current_chunk_lines.append(cleaned_line)
+
+        # Add the last chunk
+        if current_chunk_lines:
+            chunk_text = self.clean_text("\n".join(current_chunk_lines))
+            # Check if last chunk is just a header line
+            if chunk_text.upper() != current_section or len(current_chunk_lines) > 1:
+                 chunks.append({
+                    "text": f"[Page {page_num + 1}] [{current_section}]\n{chunk_text}",
                     "page": page_num + 1,
-                    "chunk_index": i # Index within the page
-                 })
-        return chunks
+                    "chunk_index": chunk_index_counter,
+                    "section": current_section
+                })
+
+        # --- Post-processing: Split very large chunks ---
+        final_chunks = []
+        split_chunk_index_counter = 0
+        window_size = 500; stride = 250
+
+        for i, chunk in enumerate(chunks):
+            original_text = chunk['text']
+            # Extract content text after the prefix
+            content_match = re.match(r'\[Page \d+\] \[(.*?)\]\n?(.*)', original_text, re.DOTALL)
+            if content_match:
+                 section_name = content_match.group(1)
+                 content_text = content_match.group(2)
+            else: # Fallback if regex fails (shouldn't happen)
+                 section_name = chunk.get('section', 'Unknown')
+                 content_text = original_text # Use full text
+
+            if len(content_text) > window_size * 1.5: # Split if significantly larger
+                # print(f"    ⚠️ Splitting large chunk (Page {chunk['page']}, Section: {section_name}, Orig Index: {chunk['chunk_index']}, Length: {len(content_text)})")
+                sub_chunks = []
+                for j in range(0, len(content_text), stride):
+                    sub_chunk_text = content_text[j:j + window_size]
+                    if len(sub_chunk_text.strip()) > 30: # Slightly lower threshold for sub-chunks
+                        sub_chunks.append({
+                            "text": f"[Page {chunk['page']}] [{section_name}] (Part {j//stride + 1})\n{self.clean_text(sub_chunk_text)}",
+                            "page": chunk['page'],
+                            "chunk_index": split_chunk_index_counter,
+                            "section": section_name # Carry over section name
+                        })
+                        split_chunk_index_counter += 1
+                if sub_chunks:
+                    final_chunks.extend(sub_chunks)
+                else: # Fallback if splitting yields nothing substantial
+                    chunk['chunk_index'] = split_chunk_index_counter
+                    final_chunks.append(chunk)
+                    split_chunk_index_counter += 1
+            else: # Keep chunk as is
+                 chunk['chunk_index'] = split_chunk_index_counter
+                 final_chunks.append(chunk)
+                 split_chunk_index_counter += 1
+
+        return final_chunks
 
     def extract_from_pdf(self, file_path):
         """Extract text and chunk it based on the chosen strategy."""
@@ -61,72 +165,95 @@ class PDFProcessor:
         try:
             doc = fitz.open(file_path)
             for page_num, page in enumerate(doc):
-                text = page.get_text()
+                # Extract text with layout preservation if possible, fallback to plain text
+                text = page.get_text("text") # Simple text extraction
+                if not text.strip():
+                     text = page.get_text() # Fallback if simple text fails
+
                 if page_num == 0:
                     raw_first_page_text = text # For name extraction
 
                 if text.strip():
-                    if self.chunk_strategy == 'paragraph':
-                        page_chunks = self.chunk_text_by_paragraph(text, page_num)
-                        all_chunks.extend(page_chunks)
-                    else: # Default to page chunking (as before)
-                         all_chunks.append({
-                            "text": f"[Page {page_num + 1}] {text}",
+                    if self.chunk_strategy == 'smart_section':
+                        page_chunks = self.chunk_text_smart_section(text, page_num)
+                    # Add other strategies here if needed ('paragraph', 'sliding_window')
+                    else: # Default/fallback to page chunking
+                        page_chunks = [{
+                            "text": f"[Page {page_num + 1}] {self.clean_text(text)}",
                             "page": page_num + 1,
-                            "chunk_index": 0
-                         })
+                            "chunk_index": 0,
+                            "section": "Unknown"
+                        }]
+
+                    all_chunks.extend(page_chunks)
             doc.close()
             print(f"📄 Extracted and chunked into {len(all_chunks)} chunks using '{self.chunk_strategy}' strategy.")
+            # Debug: Print first few chunks
+            # for i, c in enumerate(all_chunks[:5]):
+            #      print(f"  Chunk {i}: Page {c['page']}, Idx: {c['chunk_index']}, Section: {c.get('section', 'N/A')}, Text: {c['text'][:100]}...")
             return all_chunks, raw_first_page_text
         except Exception as e:
             print(f"❌ Error extracting/chunking PDF {os.path.basename(file_path)}: {str(e)}")
             return [], ""
-
-    # --- extract_candidate_name and embed_text methods (Keep as in previous version) ---
+        
+    # --- extract_candidate_name (Keep as is from v3) ---
     def extract_candidate_name(self, raw_first_page_text):
-        """Extracts a candidate name from the beginning of the raw resume text."""
         if not raw_first_page_text: return "Unknown Candidate"
-        lines = raw_first_page_text.strip().split('\n')
+        lines = raw_first_page_text.strip().split('\n')[:8]; potential_names = []
         for line in lines:
             cleaned_line = line.strip()
-            if cleaned_line and '@' not in cleaned_line and not any(c.isdigit() for c in cleaned_line) and sum(c.isalpha() for c in cleaned_line) > len(cleaned_line) / 2 :
-                potential_name = cleaned_line[:60]
-                if ' ' in potential_name.strip():
-                    print(f"ℹ️ Extracted potential name: '{potential_name.strip()}'")
-                    return potential_name.strip()
+            if not cleaned_line or '@' in cleaned_line or re.search(r'[\d\-]{5,}', cleaned_line) or len(cleaned_line) > 50: continue
+            if (cleaned_line.isupper() or cleaned_line.istitle()) and 1 < len(cleaned_line.split()) <= 3:
+                 is_likely_header = any(header in cleaned_line.upper() for header in ["EDUCATION", "EXPERIENCE", "SKILLS", "PROJECTS", "SUMMARY", "OBJECTIVE", "CONTACT"])
+                 if not is_likely_header and all(re.match(r'^[A-Za-z\s\-]+$', part) for part in cleaned_line.split()): potential_names.append((1, cleaned_line))
+        for i, line in enumerate(lines):
+            if i > 0:
+                prev_line = lines[i-1].strip().lower()
+                if prev_line.startswith("name") and ':' in prev_line:
+                     cleaned_line = line.strip()
+                     if cleaned_line and 1 < len(cleaned_line.split()) <= 4 and len(cleaned_line) < 60: potential_names.append((2, cleaned_line))
+        if not potential_names:
+             for line in lines:
+                 cleaned_line = line.strip()
+                 if cleaned_line and '@' not in cleaned_line and not re.search(r'[\d\-()]{5,}', cleaned_line) and len(cleaned_line) < 60:
+                     parts = cleaned_line.split()
+                     if 1 < len(parts) <= 4 and sum(c.isalpha() for c in cleaned_line) > len(cleaned_line) * 0.6:
+                          is_likely_header = any(header in cleaned_line.upper() for header in ["EDUCATION", "EXPERIENCE", "SKILLS", "PROJECTS", "SUMMARY", "OBJECTIVE", "CONTACT"])
+                          if not is_likely_header: potential_names.append((3, cleaned_line)); break
+        if potential_names:
+             potential_names.sort(); best_name = potential_names[0][1]
+             # print(f"ℹ️ Extracted potential name (Priority {potential_names[0][0]}): '{best_name}'")
+             return best_name
         return "Unknown Candidate"
 
+    # --- embed_text (Keep as is) ---
     def embed_text(self, chunk_dicts, batch_size=32):
-        """Generate embeddings for text content within chunk dictionaries."""
-        embeddings = []
-        texts_to_embed = [chunk['text'] for chunk in chunk_dicts if chunk.get('text')]
+        embeddings = []; texts_to_embed = [chunk['text'] for chunk in chunk_dicts if chunk.get('text')]
         if not texts_to_embed: return embeddings
-
-        print(f"⏳ Generating embeddings for {len(texts_to_embed)} text chunks...")
-        for batch in tqdm(batch_iterate(texts_to_embed, batch_size), total= -(-len(texts_to_embed) // batch_size), desc="Embedding"):
+        # print(f"⏳ Generating embeddings for {len(texts_to_embed)} text chunks...")
+        # Use math.ceil for ceiling division to get correct batch count
+        total_batches = math.ceil(len(texts_to_embed) / batch_size)
+        for batch in tqdm(batch_iterate(texts_to_embed, batch_size), total=total_batches, desc="Embedding", leave=False):
             try:
                 batch_embeddings = self.text_model.encode(batch, convert_to_numpy=True, show_progress_bar=False)
                 embeddings.extend(batch_embeddings.tolist())
             except Exception as e:
                 print(f"❌ Error embedding batch: {e}")
                 embeddings.extend([[0.0] * self.embedding_dim] * len(batch))
-            if torch.cuda.is_available(): torch.cuda.empty_cache()
-        print(f"✅ Embeddings generated.")
+        # print(f"✅ Embeddings generated.")
         return embeddings
 
-
-# --- ResumeVectorDB Class (MODIFIED for new chunk structure) ---
+# --- ResumeVectorDB Class (Keep as is from v3) ---
 class ResumeVectorDB:
-    # --- __init__, define_client, create_collection, check_document_exists (Keep as in previous version) ---
-    def __init__(self, collection_name, text_vector_dim, batch_size=64, qdrant_url=None, qdrant_api_key=None):
+    def __init__(self, collection_name, text_vector_dim, batch_size=128, qdrant_url=None, qdrant_api_key=None): # Increased batch size
         self.collection_name = collection_name; self.batch_size = batch_size; self.text_vector_dim = text_vector_dim
         self.qdrant_url = qdrant_url or QDRANT_URL; self.qdrant_api_key = qdrant_api_key or QDRANT_API_KEY; self.client = None
         if not self.qdrant_url or not self.qdrant_api_key: raise ValueError("Qdrant URL and API Key must be provided.")
 
     def define_client(self):
         try:
-            self.client = QdrantClient(url=self.qdrant_url, api_key=self.qdrant_api_key, timeout=120)
-            self.client.get_collections(); print(f"✅ Qdrant client initialized: {self.qdrant_url}")
+            self.client = QdrantClient(url=self.qdrant_url, api_key=self.qdrant_api_key, timeout=180)
+            self.client.get_collections(); # print(f"✅ Qdrant client initialized: {self.qdrant_url}")
         except Exception as e: print(f"❌ Failed to initialize Qdrant client: {e}"); self.client = None
 
     def create_collection(self, force_recreate=False):
@@ -134,223 +261,405 @@ class ResumeVectorDB:
         text_collection_name = f"{self.collection_name}_text"
         try:
             collection_exists = False
-            try: self.client.get_collection(collection_name=text_collection_name); collection_exists = True; print(f"ℹ️ Collection '{text_collection_name}' exists.")
+            try: self.client.get_collection(collection_name=text_collection_name); collection_exists = True; # print(f"ℹ️ Collection '{text_collection_name}' exists.")
             except UnexpectedResponse as e:
-                 if e.status_code == 404: print(f"ℹ️ Collection '{text_collection_name}' not found."); collection_exists = False
+                 if hasattr(e, 'status_code') and e.status_code == 404: collection_exists = False # print(f"ℹ️ Collection '{text_collection_name}' not found.")
                  else: raise e
             except Exception as e: print(f"⚠️ Error checking collection: {e}"); collection_exists = False
             if force_recreate and collection_exists:
-                print(f"⏳ Deleting existing collection '{text_collection_name}'..."); self.client.delete_collection(collection_name=text_collection_name)
-                print(f"✅ Collection '{text_collection_name}' deleted."); collection_exists = False
+                print(f"⏳ Deleting existing collection '{text_collection_name}'..."); self.client.delete_collection(collection_name=text_collection_name, timeout=60)
+                print(f"✅ Collection '{text_collection_name}' deleted."); collection_exists = False; time.sleep(2)
             if not collection_exists:
                 print(f"⏳ Creating collection: {text_collection_name}..."); self.client.create_collection(collection_name=text_collection_name, vectors_config=VectorParams(size=self.text_vector_dim, distance=Distance.COSINE))
                 print(f"✅ Created collection: {text_collection_name}")
         except Exception as e: print(f"❌ Error managing collection '{text_collection_name}': {e}")
 
-    def check_document_exists(self, document_id, candidate_id):
-        if not self.client: return False
-        text_collection_name = f"{self.collection_name}_text"
-        try:
-            response, _ = self.client.scroll(collection_name=text_collection_name, scroll_filter=models.Filter(must=[models.FieldCondition(key="document_id", match=models.MatchValue(value=document_id)), models.FieldCondition(key="candidate_id", match=models.MatchValue(value=candidate_id))]), limit=1, with_payload=False, with_vectors=False)
-            if response: print(f"ℹ️ Check found existing data for doc '{document_id}', cand '{candidate_id}'."); return True
-            return False
-        except UnexpectedResponse as e:
-             if e.status_code == 404: return False
-             print(f"❌ Error checking doc existence (HTTP {e.status_code}): {e}"); return False
-        except Exception as e: print(f"❌ Error checking doc existence: {e}"); return False
-
-    # MODIFIED ingest_text_data
     def ingest_text_data(self, text_embeddings, chunk_dicts, document_id, candidate_id, candidate_name):
-        """Ingest resume chunk data into Qdrant."""
         if not self.client: print("❌ Cannot ingest, client not initialized."); return False
         text_collection_name = f"{self.collection_name}_text"
-        # self.check_document_exists(document_id, candidate_id) # Optional check
-
         try:
             points = []
-            # Ensure embeddings and chunk_dicts align
             if len(text_embeddings) != len(chunk_dicts):
-                 print(f"❌ Error: Mismatch between embeddings ({len(text_embeddings)}) and chunks ({len(chunk_dicts)}) for doc {document_id}. Skipping ingestion.")
-                 return False
-
+                 print(f"❌ Error: Mismatch embed ({len(text_embeddings)}) vs chunk ({len(chunk_dicts)}) for {document_id}. Skip."); return False
             for i, embedding in enumerate(text_embeddings):
                 chunk_data = chunk_dicts[i]
-                point_id = str(uuid.uuid4())
-                points.append(
-                    models.PointStruct(
-                        id=point_id,
-                        vector=embedding,
-                        payload={
-                            # Ensure all keys exist in chunk_data, provide defaults if necessary
-                            "text": chunk_data.get('text', ''), # Get text from dict
-                            "page": chunk_data.get('page', -1), # Get page num
-                            "chunk_index": chunk_data.get('chunk_index', -1), # Get chunk index
-                            "document_id": document_id,
-                            "candidate_id": candidate_id,
-                            "candidate_name": candidate_name,
-                        }
-                    )
-                )
-            if not points: print(f"ℹ️ No points to ingest for '{document_id}'."); return False
-
-            print(f"⏳ Upserting {len(points)} points for doc '{document_id}' (Cand: '{candidate_name}') in batches...")
-            for batch in tqdm(batch_iterate(points, self.batch_size), total=-(-len(points)//self.batch_size), desc="Upserting"):
-                self.client.upsert(collection_name=text_collection_name, points=batch, wait=True)
-            print(f"✅ Successfully upserted doc '{document_id}' for candidate '{candidate_name}'.")
+                points.append(models.PointStruct(id=str(uuid.uuid4()), vector=embedding, payload={
+                            "text": chunk_data.get('text', ''), "page": chunk_data.get('page', -1),
+                            "chunk_index": chunk_data.get('chunk_index', -1), "section": chunk_data.get('section', 'Unknown'),
+                            "document_id": document_id, "candidate_id": candidate_id, "candidate_name": candidate_name,
+                        }))
+            if not points: print(f"ℹ️ No points to ingest for '{document_id}'."); return True
+            # print(f"⏳ Upserting {len(points)} points for doc '{document_id}'...")
+            # Upsert in batches using the batch_iterate helper
+            total_batches = math.ceil(len(points) / self.batch_size)
+            for batch in tqdm(batch_iterate(points, self.batch_size), total=total_batches, desc=f"Upserting {document_id}", leave=False):
+                 operation_info = self.client.upsert(collection_name=text_collection_name, points=batch, wait=True)
+                 if operation_info.status != models.UpdateStatus.COMPLETED:
+                      print(f"⚠️ Batch upsert issue for doc '{document_id}', status: {operation_info.status}. Check logs.")
+                      # Optionally return False or raise an error here
+            # print(f"✅ Upsert completed for doc '{document_id}'.")
             return True
-        except Exception as e: print(f"❌ Error inserting doc '{document_id}': {e}"); return False
+        except Exception as e: print(f"❌ Error during upsert for doc '{document_id}': {e}"); return False
 
 
-# --- ResumeRetriever Class (Keep as in previous version - debug mode prints raw results) ---
+# --- ResumeRetriever Class (REVISED query expansion) ---
 class ResumeRetriever:
     def __init__(self, vector_db, pdf_processor):
-        self.vector_db = vector_db; self.pdf_processor = pdf_processor
-        print(f"ℹ️ ResumeRetriever initialized [DEBUG MODE: No score threshold filtering]")
+        self.vector_db = vector_db
+        self.pdf_processor = pdf_processor
+        # *** UPDATED Query Expansions ***
+        self.query_expansions = {
+            "skills": ["technologies", "programming", "tools", "frameworks", "libraries", "technical skills", "competencies"],
+            "experience": ["work", "job", "employment", "professional experience", "role", "position"],
+            "education": ["degree", "university", "college", "academic", "qualification"],
+            "projects": ["portfolio", "personal projects", "academic projects", "papers", "research", "development"], # Added relevant terms
+            "contact": ["email", "phone", "address", "contact details", "location"],
+            "courses": ["certifications", "training", "online courses", "professional development", "credential"],
+            "internship": ["intern", "trainee", "co-op", "work placement"]
+        }
+        # print(f"ℹ️ ResumeRetriever initialized.")
 
-    def search(self, query, candidate_id=None, top_k=15, max_retries=3, initial_delay=1): # Increased top_k again
+    def _simple_expand_query(self, query):
+        """Expands query using simple keyword matching and synonyms."""
+        expanded_terms = [query.strip()] # Start with the original query cleaned
+        query_lower = query.lower()
+        matched = False
+        for keyword, expansions in self.query_expansions.items():
+            # Use word boundaries for keyword matching to avoid partial matches
+            if re.search(rf"\b{keyword}\b", query_lower):
+                # Add expansions BUT prioritize the original query structure
+                # Simple approach: just append relevant terms
+                expanded_terms.extend([exp for exp in expansions if exp not in query_lower])
+                matched = True
+
+        # If no keyword matched, maybe just use the original query
+        if not matched and len(query.split()) > 5: # Don't expand long, specific queries if no keyword hit
+             return query.strip()
+
+        # Create unique terms, keep order roughly, join
+        # Using dict.fromkeys preserves order in Python 3.7+
+        unique_terms = list(dict.fromkeys(expanded_terms))
+        expanded_query = " ".join(unique_terms)
+
+        # Only log if expansion actually changed the query meaningfully
+        if expanded_query.lower() != query.lower().strip():
+             # print(f"    🔍 Expanded query: '{query}' -> '{expanded_query}'")
+             return expanded_query
+        return query.strip() # Return original cleaned query if no change
+
+
+    def search(self, query, candidate_id=None, top_k=35, max_retries=3, initial_delay=1): # Keep top_k higher
+        """Search Qdrant with query expansion, retry logic."""
         if not self.vector_db.client: print("❌ Cannot search, client not initialized."); return []
-        prepared_query = prepare_query(query)
+
+        original_query = query
+        expanded_query = self._simple_expand_query(original_query)
+        prepared_query = prepare_query(expanded_query)
+
         try: query_vector = self.pdf_processor.text_model.encode(prepared_query).tolist()
-        except Exception as e: print(f"❌ Error encoding query '{query}': {e}"); return []
+        except Exception as e: print(f"❌ Error encoding query '{prepared_query}': {e}"); return []
+
         text_collection_name = f"{self.vector_db.collection_name}_text"
-        search_filter = None
-        if candidate_id: search_filter = models.Filter(must=[models.FieldCondition(key="candidate_id", match=models.MatchValue(value=candidate_id))]); print(f"ℹ️ Searching within cand_id: {candidate_id}")
-        else: print(f"ℹ️ Searching across all resumes.")
+        search_filter = models.Filter(must=[models.FieldCondition(key="candidate_id", match=models.MatchValue(value=candidate_id))]) if candidate_id else None
+        # if candidate_id: print(f"ℹ️ Searching within cand_id: {candidate_id}")
 
         for attempt in range(max_retries):
             try:
-                search_result = self.vector_db.client.search(collection_name=text_collection_name, query_vector=query_vector, query_filter=search_filter, limit=top_k, search_params=SearchParams(hnsw_ef=128, exact=False), with_payload=True)
-                print(f"✅ [DEBUG] Retrieved {len(search_result)} raw chunks from Qdrant.")
-                if search_result:
-                    print("--- Retrieved Chunks (Top {}): ---".format(len(search_result)))
-                    for i, point in enumerate(search_result):
-                        text_snippet = point.payload.get('text', 'N/A')[:150].replace('\n', ' ') + "..."; page_num = point.payload.get('page', 'N/A'); chunk_idx = point.payload.get('chunk_index', 'N/A')
-                        print(f"  {i+1}. Score: {point.score:.4f} | Doc: {point.payload.get('document_id', 'N/A')} | Cand: {point.payload.get('candidate_id', 'N/A')} | Page: {page_num} | Chunk: {chunk_idx}")
-                        print(f"     Text: {text_snippet}")
-                    print("---------------------------------")
-                return search_result # Return all results for debugging RAG step
-            except UnexpectedResponse as e: print(f"❌ Qdrant search error (Attempt {attempt + 1}/{max_retries}, HTTP {e.status_code}): {e}");
-            except Exception as e: print(f"❌ Qdrant search error (Attempt {attempt + 1}/{max_retries}): {e}");
-            if attempt >= max_retries - 1: print("❌ Max retries reached."); return []
-            wait_time = initial_delay * (2 ** attempt); print(f"Retrying in {wait_time}s..."); time.sleep(wait_time)
+                search_result = self.vector_db.client.search(
+                    collection_name=text_collection_name, query_vector=query_vector, query_filter=search_filter,
+                    limit=top_k, search_params=SearchParams(hnsw_ef=128, exact=False), # hnsw_ef=128 good balance
+                    with_payload=True, score_threshold=0.0 # Retrieve all, filter in RAG
+                )
+                # print(f"✅ [DEBUG] Retrieved {len(search_result)} raw chunks from Qdrant for query: '{prepared_query}'.")
+                # if search_result:
+                #     scores = [p.score for p in search_result]
+                #     print(f"    Scores range: [{min(scores):.4f} - {max(scores):.4f}]")
+                return search_result
+            except UnexpectedResponse as e: print(f"⚠️ Qdrant search error (Attempt {attempt+1}/{max_retries}, HTTP {getattr(e, 'status_code', 'N/A')}): {e}")
+            except Exception as e: print(f"❌ Unexpected search error (Attempt {attempt+1}/{max_retries}): {e}")
+            if attempt >= max_retries - 1: print("❌ Max search retries reached."); return []
+            wait_time = initial_delay * (2 ** attempt); # print(f"Retrying search in {wait_time}s...")
+            time.sleep(wait_time)
         return []
 
 
-# --- ResumeRAG Class (Keep as in previous version - applies RAG threshold) ---
+# --- ResumeRAG Class (REVISED Context Generation & Prompt) ---
 class ResumeRAG:
     def __init__(self, retriever, model_name="gemma2-9b-it", api_key=None):
         self.model_name = model_name; self.api_key = api_key or GROQ_API_KEY
         if not self.api_key: raise ValueError("Groq API key required")
         self.retriever = retriever; self.api_url = "https://api.groq.com/openai/v1/chat/completions"
-        print(f"✅ ResumeRAG initialized with model: {self.model_name}")
+        # RAG Parameters
+        self.base_threshold = 0.15; self.min_threshold = 0.10
+        self.context_limit = 7000 # Slightly increased limit
+        self.max_chunks_in_context = 20 # Keep max chunks limit
+        # Keywords indicating list-type questions for context prioritization
+        self.list_query_keywords = ["list", "what are", "skills", "projects", "courses", "certifications", "experience", "languages", "tools"]
+        # print(f"✅ ResumeRAG initialized with model: {self.model_name}, Context Limit: {self.context_limit} chars, Max Chunks: {self.max_chunks_in_context}")
 
+    # Helper to identify query type
+    def _is_list_query(self, query):
+        return any(keyword in query.lower() for keyword in self.list_query_keywords)
+
+    # *** REVISED Context Generation with Section Prioritization ***
     def generate_context(self, query, candidate_id=None):
-        text_results = self.retriever.search(query, candidate_id=candidate_id) # Gets all results now
-        rag_threshold = 0.1 # Apply threshold here for context
-        filtered_rag_results = [point for point in text_results if point.score >= rag_threshold]
-        print(f"ℹ️ RAG Context: Using {len(filtered_rag_results)} chunks (score >= {rag_threshold}) out of {len(text_results)} retrieved.")
-        if not filtered_rag_results:
-             if text_results: print(f"ℹ️ No chunks above RAG threshold ({rag_threshold}). Max score: {text_results[0].score:.4f}")
-             else: print(f"ℹ️ No chunks retrieved at all.")
-             return "No relevant information found in the resume(s)."
-        seen_texts = set(); relevant_texts = []
-        for point in sorted(filtered_rag_results, key=lambda x: x.score, reverse=True):
-            text = point.payload.get("text", ""); doc_id = point.payload.get("document_id", "N/A"); cand_id = point.payload.get("candidate_id", "N/A"); cand_name = point.payload.get("candidate_name", "N/A"); score = point.score; page = point.payload.get("page", "N/A"); chunk_idx = point.payload.get("chunk_index", "N/A")
-            context_prefix = f"[Source: {doc_id}, Cand: {cand_name} ({cand_id}), Page: {page}, Chunk: {chunk_idx}, Score: {score:.3f}]\n"
-            full_text = context_prefix + text
-            if text not in seen_texts: relevant_texts.append(full_text); seen_texts.add(text)
-        if not relevant_texts: return "No relevant information found."
-        text_context = "\n\n---\n\n".join(relevant_texts)
-        return f"Context from Resume(s):\n---------------------\n{text_context}\n---------------------"
+        """Generate context, prioritizing chunks from sections relevant to the query type."""
+        text_results = self.retriever.search(query, candidate_id=candidate_id, top_k=40) # Retrieve slightly more
+        if not text_results: return "No relevant information found in the resume(s)."
 
+        sorted_results = sorted(text_results, key=lambda x: x.score, reverse=True)
+        max_score = sorted_results[0].score if sorted_results else 0
+
+        # Dynamic threshold
+        rag_threshold = self.base_threshold
+        if max_score < 0.35: rag_threshold = max(self.min_threshold, max_score * 0.6) # More lenient if max score low
+        elif max_score > 0.6: rag_threshold = max(self.base_threshold, max_score * 0.30) # Stricter if high
+
+        # Filter by threshold
+        threshold_filtered_results = [point for point in sorted_results if point.score >= rag_threshold]
+
+        if not threshold_filtered_results:
+            # print(f"    ⚠️ No chunks above RAG threshold ({rag_threshold:.4f}). Falling back to top 5.")
+            threshold_filtered_results = sorted_results[:5]
+            if not threshold_filtered_results: return "No relevant information found in the resume(s)."
+
+        # --- Context Selection with Prioritization ---
+        final_context_chunks = []
+        current_context_length = 0
+        seen_texts = set()
+        used_indices = set() # Track indices of points already added
+
+        # If it's a list-type query, try to ensure relevant sections are represented
+        if self._is_list_query(query):
+            # Identify potentially relevant sections based on query keywords
+            relevant_section_keywords = []
+            query_lower = query.lower()
+            if any(k in query_lower for k in ["project", "paper", "research"]): relevant_section_keywords.extend(["PROJECTS", "PAPERS", "ACADEMIC"])
+            if any(k in query_lower for k in ["skill", "technolog", "tool", "programming"]): relevant_section_keywords.extend(["SKILLS"])
+            if any(k in query_lower for k in ["course", "certificat", "training"]): relevant_section_keywords.extend(["COURSES", "CERTIFICATIONS"])
+            if any(k in query_lower for k in ["experience", "job", "intern"]): relevant_section_keywords.extend(["EXPERIENCE"])
+            if any(k in query_lower for k in ["education", "degree"]): relevant_section_keywords.extend(["EDUCATION"])
+
+            # Select top chunk from each relevant section found in filtered results
+            prioritized_chunks = []
+            found_sections = set()
+            for point in threshold_filtered_results:
+                section = point.payload.get("section", "Unknown").upper()
+                point_idx = point.id # Assuming point ID is unique or use index if not
+
+                # Check if this section matches keywords and hasn't been prioritized yet
+                if any(key in section for key in relevant_section_keywords) and section not in found_sections:
+                     # Check length before adding
+                     entry_text = point.payload.get("text", "")
+                     prefix = f"[Source: ... Relevance={point.score:.3f}]\n" # Simplified prefix for length check
+                     if current_context_length + len(prefix) + len(entry_text) <= self.context_limit:
+                         if entry_text not in seen_texts:
+                             final_context_chunks.append(point) # Add the actual point
+                             seen_texts.add(entry_text)
+                             current_context_length += len(prefix) + len(entry_text)
+                             used_indices.add(point_idx)
+                             found_sections.add(section) # Mark section as covered
+                             if len(final_context_chunks) >= self.max_chunks_in_context: break # Stop if max chunks hit
+
+
+        # Fill remaining context space with highest-scoring chunks not already included
+        remaining_slots = self.max_chunks_in_context - len(final_context_chunks)
+        if remaining_slots > 0:
+             for point in threshold_filtered_results:
+                 point_idx = point.id
+                 if point_idx not in used_indices:
+                     entry_text = point.payload.get("text", "")
+                     prefix = f"[Source: ... Relevance={point.score:.3f}]\n"
+                     if current_context_length + len(prefix) + len(entry_text) <= self.context_limit:
+                         if entry_text not in seen_texts:
+                              final_context_chunks.append(point)
+                              seen_texts.add(entry_text)
+                              current_context_length += len(prefix) + len(entry_text)
+                              used_indices.add(point_idx)
+                              remaining_slots -= 1
+                              if remaining_slots <= 0: break # Stop if slots filled or context limit hit
+                     else: # Stop if next chunk exceeds limit
+                          # print(f"    ⚠️ Context length limit ({self.context_limit} chars) reached during fill.")
+                          break
+
+        if not final_context_chunks: return "No relevant context could be selected."
+
+        # Sort final selection by score for better presentation to LLM? Optional.
+        final_context_chunks.sort(key=lambda x: x.score, reverse=True)
+
+        # Format the final context string
+        context_entries = []
+        for point in final_context_chunks:
+             prefix = f"[Source: Doc='{point.payload.get('document_id', 'N/A')}', Cand='{point.payload.get('candidate_name', 'N/A')}', Page={point.payload.get('page', 'N/A')}, Section='{point.payload.get('section', 'N/A')}', Relevance={point.score:.3f}]\n"
+             context_entries.append(prefix + point.payload.get("text", ""))
+
+        # print(f"ℹ️ RAG Context: Using {len(final_context_chunks)} prioritized/selected chunks (Score >= {rag_threshold:.4f}, Max Score: {max_score:.4f}).")
+        text_context = "\n\n---\n\n".join(context_entries)
+        return f"Context from Resume(s) (Score Threshold: {rag_threshold:.3f}, Max Score: {max_score:.3f}, Chunks: {len(final_context_chunks)}):\n---------------------\n{text_context}\n---------------------"
+
+
+    # *** REVISED Query Prompt ***
     def query(self, query, candidate_id=None, candidate_name=None):
-        print(f"\n⏳ Generating context for query: '{query}'" + (f" for cand_id: '{candidate_id}'" if candidate_id else ""))
+        """Query the LLM with revised context generation and prompt."""
+        # print(f"\n⏳ Generating context for query: '{query}'" + (f" for cand_id: '{candidate_id}'" if candidate_id else ""))
         context = self.generate_context(query=query, candidate_id=candidate_id)
+
         if not context or context.strip().startswith("No relevant information found"):
-            print("❌ No relevant context found above RAG threshold."); no_context_prompt = f"""User question: "{query}". Candidate: ID='{candidate_id}', Name='{candidate_name}'. No relevant excerpts found in resume documents meeting relevance threshold. Inform user concisely."""
+            print("❌ No relevant context generated.")
+            no_context_prompt = f"""User question: "{query}"
+            Candidate: ID='{candidate_id}', Name='{candidate_name}'.
+            Instructions: Inform the user clearly and concisely that the requested information ('{query}') could not be found in the provided resume excerpts based on relevance matching. Do not invent information."""
             return self.call_llm(no_context_prompt, is_no_context=True)
-        print(f"✅ Context generated. Querying LLM: {self.model_name}")
-        candidate_prompt_info = f"Candidate Info: ID={candidate_id}, Name={candidate_name}\n\n" if candidate_id else ""
-        qa_prompt_tmpl_str = f"""**Resume Query Analysis**
+
+        # print(f"✅ Context generated. Querying LLM: {self.model_name}")
+        candidate_info = f"Candidate Info: ID='{candidate_id}', Name='{candidate_name}'\n\n" if candidate_id else ""
+
+        # --- REVISED PROMPT TEMPLATE v4 ---
+        qa_prompt_tmpl_str = f"""**Resume Analysis Task**
+
         **User Question:** "{query}"
-        {candidate_prompt_info}**Extracted Resume Information (Context):**\n{context}
-        **Instructions:** Answer based *only* on the provided context. Be concise. If info is missing, state that.
+
+        {candidate_info}
+        **Resume Information (Context - Extracted relevant excerpts):**
+        {context}
+
+        **Instructions for Answering:**
+        1.  **Strictly Adhere to Context:** Base your answer ONLY on the information explicitly present in the 'Resume Information (Context)' provided above. Do NOT infer or add information not present.
+        2.  **Address the Question Directly:** Answer the user's question precisely.
+        3.  **Extract Completely (Especially for Lists):** If the question asks for a list (e.g., "list skills", "what projects", "courses", "certifications"), extract ALL relevant items mentioned within the context. Pay close attention to the 'Section' tag in the context sources (e.g., 'TECHNICAL SKILLS', 'ACADEMIC PROJECTS AND PAPERS', 'COURSES AND CERTIFICATIONS'). Synthesize information if items are split across context chunks from the *same logical section*. Present lists clearly using bullet points.
+        4.  **Acknowledge Missing Information:**
+            * If the context contains the relevant section(s) (e.g., 'ACADEMIC PROJECTS AND PAPERS' is present) but the *specific detail* requested isn't mentioned (e.g., asking about a project not listed), state that the detail isn't mentioned in the provided excerpts.
+            * If the *entire relevant section* seems absent from the provided context excerpts (e.g., no chunks tagged with 'PROJECTS' or similar were included in the context), state "The provided resume excerpts do not seem to contain details about [Requested Topic, e.g., Projects]."
+        5.  **Be Concise:** Provide the information directly.
+
         **Answer:**"""
+        # --- END REVISED PROMPT TEMPLATE v4 ---
+
         return self.call_llm(qa_prompt_tmpl_str)
 
+    # --- call_llm (Keep as is from v3) ---
     def call_llm(self, prompt, is_no_context=False):
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        system_message = "You are a helpful assistant analyzing resume content based strictly on provided excerpts. If info is missing, state that."
-        if is_no_context: system_message = "You are a helpful assistant. Inform user concisely that requested info wasn't found in resume excerpts based on relevance."
-        payload = {"model": self.model_name, "messages": [{"role": "system", "content": system_message}, {"role": "user", "content": prompt}], "temperature": 0.1, "max_tokens": 1500, "top_p": 0.9}
+        system_message = "You are an expert resume analysis assistant. Answer questions based *strictly* on the provided resume excerpts (context). Extract information accurately and completely. If information is missing from the context, state that clearly."
+        if is_no_context: system_message = "You are a helpful assistant. Inform the user concisely that the requested information was not found in the relevant resume excerpts provided."
+        payload = {"model": self.model_name, "messages": [{"role": "system", "content": system_message},{"role": "user", "content": prompt}],
+                   "temperature": 0.0, "max_tokens": 2000, "top_p": 0.9 }
         try:
-            response = requests.post(self.api_url, headers=headers, data=json.dumps(payload), timeout=120); response.raise_for_status(); result = response.json()
-            if result.get("choices") and result["choices"][0].get("message") and result["choices"][0]["message"].get("content"): print("✅ LLM response received."); return result["choices"][0]["message"]["content"].strip()
-            elif "error" in result: print(f"❌ Groq API error: {result['error'].get('message')}"); return f"Error: AI API error - {result['error'].get('message')}"
+            response = requests.post(self.api_url, headers=headers, data=json.dumps(payload), timeout=180)
+            response.raise_for_status()
+            result = response.json()
+            if result.get("choices") and result["choices"][0].get("message") and result["choices"][0]["message"].get("content"):
+                # print("✅ LLM response received.")
+                llm_content = result["choices"][0]["message"]["content"].strip()
+                finish_reason = result["choices"][0].get("finish_reason", "N/A")
+                # if finish_reason != "stop": print(f"    ⚠️ LLM finish reason: {finish_reason}")
+                return llm_content
+            elif "error" in result: print(f"❌ Groq API error: {result['error'].get('message', 'Unknown')}"); return f"Error: AI API error - {result['error'].get('message', 'Unknown')}"
             else: print(f"❌ Unexpected Groq API response: {result}"); return "Error: Unexpected AI API response."
         except requests.exceptions.Timeout: print(f"❌ Groq API timed out."); return "Error: AI API request timed out."
-        except requests.exceptions.RequestException as e: print(f"❌ Groq API call error: {e}"); error_detail = e.response.text if e.response else "N/A"; print(f"❌ Error details: {error_detail}"); return f"Error: AI API comms failed. {e}"
-        except Exception as e: print(f"❌ Unexpected LLM query error: {e}"); return f"Error: Unexpected error. {e}"
+        except requests.exceptions.HTTPError as http_err:
+            error_detail = http_err.response.text; print(f"❌ Groq API HTTP error: {http_err.response.status_code} - {error_detail}"); return f"Error: AI API request failed ({http_err.response.status_code})."
+        except requests.exceptions.RequestException as req_err: print(f"❌ Groq API request error: {req_err}"); return f"Error: AI API communication failed. {req_err}"
+        except Exception as e: print(f"❌ Unexpected error during LLM query: {e}"); import traceback; traceback.print_exc(); return f"Error: Unexpected error. {e}"
 
 
-# --- Main Execution (MODIFIED process_resumes call) ---
+# --- Main Execution Logic ---
 def process_resumes(directory_path, collection_name="resumes_db", force_recreate_collection=False):
     pdf_paths = glob.glob(os.path.join(directory_path, "*.pdf"))
     if not pdf_paths: print(f"❌ No PDF files found: {directory_path}"); return None, None
     print(f"Found {len(pdf_paths)} PDF files.")
 
-    # Initialize with paragraph chunking strategy
-    pdf_processor = PDFProcessor(chunk_strategy='paragraph')
+    pdf_processor = PDFProcessor(model_name='all-mpnet-base-v2', chunk_strategy='smart_section')
     vector_db = ResumeVectorDB(collection_name=collection_name, text_vector_dim=pdf_processor.embedding_dim)
-    vector_db.define_client()
+    vector_db.define_client();
     if not vector_db.client: print("❌ Halting: Qdrant client failed."); return None, None
-    vector_db.create_collection(force_recreate=force_recreate_collection) # Force recreate
+    vector_db.create_collection(force_recreate=force_recreate_collection)
 
     processed_count = 0; ingested_count = 0; candidate_map = {}
+    total_start_time = time.time()
+
     for pdf_path in pdf_paths:
-        filename = os.path.basename(pdf_path); document_id = os.path.splitext(filename)[0]
+        file_start_time = time.time()
+        filename = os.path.basename(pdf_path)
+        document_id = os.path.splitext(filename)[0].upper()
         print(f"\n--- Processing: {filename} ---")
         processed_count += 1
-        # Extract chunks (list of dicts) and raw first page text
+
         chunks, raw_first_page = pdf_processor.extract_from_pdf(pdf_path)
         if not chunks: print(f"⚠️ No chunks extracted from {filename}, skipping."); continue
-        candidate_name = pdf_processor.extract_candidate_name(raw_first_page)
-        if candidate_name == "Unknown Candidate": print(f"⚠️ No name found in {filename}. Using fallback."); candidate_id = document_id.lower().replace(" ", "_")
-        else: candidate_id = candidate_name.lower().replace(" ", "_")
-        print(f"   - Doc ID: {document_id}, Cand Name: {candidate_name}, Cand ID: {candidate_id}")
-        if candidate_id not in candidate_map: candidate_map[candidate_id] = {"name": candidate_name, "docs": []}
-        candidate_map[candidate_id]["docs"].append(document_id)
-        # Embed based on the 'text' field in each chunk dict
-        text_embeddings = pdf_processor.embed_text(chunks)
-        if not text_embeddings or len(text_embeddings) != len(chunks): print(f"⚠️ Embedding issue for {filename}, skipping ingest."); continue
-        # Pass the list of chunk dicts to ingestion
-        success = vector_db.ingest_text_data(text_embeddings, chunks, document_id, candidate_id, candidate_name)
-        if success: ingested_count += 1
+        # print(f"    Extracted {len(chunks)} chunks.")
 
-    print(f"\n--- Processing Summary ---"); print(f"Processed: {processed_count}, Newly Ingested: {ingested_count}"); print(f"Candidate Map: {candidate_map}")
-    retriever = ResumeRetriever(vector_db, pdf_processor); rag = ResumeRAG(retriever)
+        candidate_name = pdf_processor.extract_candidate_name(raw_first_page)
+        candidate_id = re.sub(r'\s+', '_', candidate_name.lower().strip()) if candidate_name != "Unknown Candidate" else document_id.lower() + "_candidate"
+        # print(f"    Cand Name: '{candidate_name}', Cand ID: '{candidate_id}'")
+
+        if candidate_id not in candidate_map: candidate_map[candidate_id] = {"name": candidate_name, "docs": []}
+        if document_id not in candidate_map[candidate_id]["docs"]: candidate_map[candidate_id]["docs"].append(document_id)
+        if candidate_name != "Unknown Candidate": candidate_map[candidate_id]["name"] = candidate_name
+
+        text_embeddings = pdf_processor.embed_text(chunks)
+        if not text_embeddings or len(text_embeddings) != len(chunks):
+            print(f"⚠️ Embedding failed/mismatch for {filename}, skipping ingest."); continue
+
+        success = vector_db.ingest_text_data(text_embeddings, chunks, document_id, candidate_id, candidate_name)
+        if success: ingested_count += 1; print(f"    Ingested {len(chunks)} points for {document_id} ({time.time() - file_start_time:.2f}s)")
+        else: print(f"⚠️ Failed to ingest data for {filename}.")
+
+    print(f"\n--- Processing Summary ---")
+    print(f"Total PDFs Processed: {processed_count}")
+    print(f"Documents Ingested/Updated: {ingested_count}")
+    print(f"Total Unique Candidates: {len(candidate_map)}")
+    print(f"Total Processing & Ingestion Time: {time.time() - total_start_time:.2f} seconds")
+
+
+    retriever = ResumeRetriever(vector_db, pdf_processor)
+    rag = ResumeRAG(retriever)
     return rag, candidate_map
 
-# --- if __name__ == "__main__": (Keep as before, ensure force_recreate=True) ---
+# --- Main execution block ---
 if __name__ == "__main__":
-    start_time = time.time()
-    resumes_directory = "/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/frontend/rag/test_resumes"
-    qdrant_collection = "candidate_resumes_v2" # Keep same name, rely on force_recreate
-    force_recreate = True # <<<--- Ensure this is True for testing
-    print(f"Using Qdrant Collection: {qdrant_collection} (Force Recreate: {force_recreate})")
+    main_start_time = time.time()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    resumes_directory = "/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/frontend/rag/test_resumes" # ADJUST PATH IF NEEDED
+    qdrant_collection = "candidate_resumes_v4" # New version
+    force_recreate = True
+    print(f"--- Configuration ---")
+    print(f"Resumes Directory: {resumes_directory}")
+    print(f"Qdrant Collection: {qdrant_collection}")
+    print(f"Force Recreate: {force_recreate}")
+    print(f"--------------------")
 
     if not os.path.isdir(resumes_directory): print(f"❌ Error: Directory not found: {resumes_directory}")
     else:
-        print("🚀 Starting Resume Processing and RAG Setup...")
+        print("\n🚀 Starting Resume Processing & RAG Setup...")
         resume_rag, candidates = process_resumes(resumes_directory, collection_name=qdrant_collection, force_recreate_collection=force_recreate)
+
         if resume_rag and candidates:
-            print("\n✅ RAG System Ready for Queries.")
-            target_candidate_id = "yash_shah"; target_candidate_name = candidates.get(target_candidate_id, {}).get("name", "Unknown")
-            if target_candidate_name != "Unknown":
-                queries = ["What is the candidate's name and contact details?", "What are the candidate's technical skills?", "Where did Yash Shah intern as an AI Software Engineer?", "List the candidate's projects", "What certifications does the candidate have?"]
-                for query in queries:
-                     print(f"\n❓ Querying (Candidate '{target_candidate_name}'): {query}"); result = resume_rag.query(query=query, candidate_id=target_candidate_id, candidate_name=target_candidate_name)
-                     print(f"\n💬 Answer:"); print(result); print("-" * 30)
-            else: print(f"\n⚠️ Cannot run specific queries: Candidate ID '{target_candidate_id}' not found.")
+            print("\n✅ RAG System Ready.")
+            target_candidate_id = None; target_candidate_name = "Yash Shah"
+            for cid, cinfo in candidates.items():
+                if cinfo["name"].lower() == target_candidate_name.lower(): target_candidate_id = cid; break
+
+            if target_candidate_id:
+                 print(f"\n🎯 Querying for candidate: '{target_candidate_name}' (ID: '{target_candidate_id}')")
+                 queries_to_run = [
+                     "What is the candidate's name and contact details?",
+                     "List all technical skills mentioned.",
+                     "Where did Yash Shah intern as an AI Software Engineer and what did he do there?",
+                     # *** TESTING PROJECT QUERY AGAIN ***
+                     "List all the academic projects and papers Yash Shah worked on, including technologies used for each.",
+                     "What courses and certifications are listed?",
+                     "Summarize the candidate's education.",
+                     "What programming languages does the candidate know?"
+                 ]
+                 for query in queries_to_run:
+                     print(f"\n❓ Query: {query}")
+                     q_start_time = time.time()
+                     result = resume_rag.query(query=query, candidate_id=target_candidate_id, candidate_name=target_candidate_name)
+                     print(f"💬 Answer:\n{result}")
+                     print(f"   (Query time: {time.time() - q_start_time:.2f}s)")
+                     print("-" * 30)
+            else: print(f"\n⚠️ Cannot run queries: Candidate '{target_candidate_name}' not found.")
         else: print("❌ Error: Resume RAG system could not be initialized.")
-    end_time = time.time(); print(f"\n--- Total Execution Time: {end_time - start_time:.2f} seconds ---")
+
+    print(f"\n--- Total Execution Time: {time.time() - main_start_time:.2f} seconds ---")
