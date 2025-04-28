@@ -70,7 +70,11 @@ class FirecrawlManager:
     def __init__(self, api_key: str):
         if not api_key:
             raise ValueError("Firecrawl API key is required.")
-        self.app = FirecrawlApp(api_key=api_key)
+        # Ensure API key is string, handle potential None from getenv more robustly
+        self.api_key = str(api_key) if api_key else None
+        if not self.api_key:
+             raise ValueError("Firecrawl API key is invalid or missing after check.")
+        self.app = FirecrawlApp(api_key=self.api_key)
         logger.info("FirecrawlManager initialized.")
 
     def scrape(self, url: str) -> Optional[Dict[str, Any]]:
@@ -79,37 +83,95 @@ class FirecrawlManager:
         Args:
             url: The URL to scrape.
         Returns:
-            The raw scrape result from Firecrawl (usually dict with 'markdown' or 'html'), or None on failure.
+            The raw scrape result from Firecrawl (usually dict with 'markdown', 'html', or 'data'), or None on failure.
         """
         logger.info(f"Attempting Firecrawl scrape for: {url}")
         try:
-            # Use scrape_url for single page scraping
+            # --- MODIFICATION START ---
+            # Prepare parameters based on config and Firecrawl API documentation
+            params_to_pass = {}
+
+            # Get page options from config
+            page_options = config.FIRECRAWL_PARAMS.get('pageOptions', {})
+
+            # Map config options to direct API parameters
+            params_to_pass['onlyMainContent'] = page_options.get('onlyMainContent', False) # Default to False if not in config
+            params_to_pass['screenshot'] = page_options.get('screenshot', False)
+            if 'waitFor' in page_options: # Pass waitFor if defined
+                 params_to_pass['waitFor'] = page_options['waitFor']
+
+            # Determine 'formats' based on include flags
+            formats = []
+            if page_options.get('includeMarkdown', False): # Default to False if not set
+                formats.append('markdown')
+            if page_options.get('includeHtml', False):
+                formats.append('html')
+            # Add 'data' format if includeJson is True
+            if page_options.get('includeJson', False):
+                formats.append('data')
+
+            # If no format specified, maybe default to markdown or html based on preference
+            if not formats:
+                formats.append('markdown') # Defaulting to markdown as per original config preference
+                logger.debug("No specific format requested in config pageOptions, defaulting Firecrawl format to ['markdown']")
+
+            params_to_pass['formats'] = formats
+
+            # You can add other direct parameters from the API docs here if needed,
+            # pulling values from config or using defaults. e.g.:
+            # params_to_pass['timeout'] = config.FIRECRAWL_TIMEOUT * 1000 # API expects ms? Check docs. Defaulting to library's timeout arg.
+
+            logger.debug(f"Calling Firecrawl scrape_url with URL: {url} and Params: {params_to_pass}")
+
+            # Call the library function with unpacked parameters + url and timeout
+            # NOTE: We pass timeout separately as it might be a direct argument to the library method
+            #       and not part of the 'payload' parameters handled by **params_to_pass.
             scrape_result = self.app.scrape_url(
                 url=url,
-                params=config.FIRECRAWL_PARAMS,
-                timeout=config.FIRECRAWL_TIMEOUT
+                timeout=config.FIRECRAWL_TIMEOUT,
+                **params_to_pass # Unpack the prepared parameters
             )
+            # --- MODIFICATION END ---
+
+
+            # Original validation logic remains the same
             if scrape_result and ('markdown' in scrape_result or 'html' in scrape_result or 'data' in scrape_result):
-                 # Check if 'data' exists and has content, prioritize it if available (structured)
+                # Prioritize returning 'data' if available and requested/present
                 if 'data' in scrape_result and scrape_result['data']:
                     logger.info(f"Firecrawl scrape successful (structured data found): {url}")
-                    return {'data': scrape_result['data']} # Return structured data directly
+                    return {'data': scrape_result['data']}
+                # Then markdown if available and requested/present
                 elif 'markdown' in scrape_result and scrape_result['markdown']:
                     logger.info(f"Firecrawl scrape successful (Markdown): {url}")
                     return {'markdown': scrape_result['markdown']}
+                # Then HTML if available and requested/present
                 elif 'html' in scrape_result and scrape_result['html']:
                      logger.info(f"Firecrawl scrape successful (HTML): {url}")
                      return {'html': scrape_result['html']}
                 else:
-                    logger.warning(f"Firecrawl scrape for {url} returned empty content.")
+                    # This case handles if the result dict exists but the expected keys have empty content
+                    logger.warning(f"Firecrawl scrape for {url} returned empty content for expected formats. Result keys: {list(scrape_result.keys())}")
                     return None
             else:
                 logger.warning(f"Firecrawl scrape failed or returned unexpected format for {url}. Result: {scrape_result}")
                 return None
+        # Catch the specific HTTPError from requests library used by firecrawl-py
+        except req_lib.exceptions.HTTPError as e:
+             # Log the specific Firecrawl error message if available in the response
+             error_details = "No specific error details in response."
+             status_code = e.response.status_code if e.response is not None else "Unknown"
+             if e.response is not None:
+                  try:
+                       error_details = e.response.json()
+                  except json.JSONDecodeError:
+                       error_details = e.response.text[:500] # Log raw text if not JSON
+             logger.error(f"Firecrawl API HTTP error for {url}: Status code {status_code}. {e}. Details: {error_details}", exc_info=False) # exc_info=False to avoid redundant traceback
+             return None
         except Exception as e:
-            logger.error(f"Firecrawl API error for {url}: {e}", exc_info=True)
+            # Catch other potential errors during the scrape call
+            logger.error(f"Firecrawl unexpected error for {url}: {e}", exc_info=True)
             return None
-
+        
 class BrowserUseManager:
     """
     Manages scraping using the browser-use framework.
