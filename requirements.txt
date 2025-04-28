@@ -1,0 +1,23 @@
+# Core scraping tools
+firecrawl-py==1.10.2
+playwright==1.40.0
+browser-use==0.1.41
+
+# LLM Interaction
+google-generativeai==0.8.5
+google-ai-generativelanguage==0.6.15
+langchain-google-genai==2.1.2
+langchain-core==0.3.49
+
+# Web Parsing & Data Handling
+beautifulsoup4==4.12.0
+lxml==5.0.0
+markdown==3.5.0
+pandas==2.0.0
+
+# Utilities
+python-dotenv>=1.0.1
+requests>=2.32.3
+thefuzz==0.20.0
+python-dateutil==2.8.0
+nest_asyncio==1.6.0
