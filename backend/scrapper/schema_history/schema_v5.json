@@ -1,0 +1,149 @@
+{
+    "version": "v5",
+    "schema": {
+        "research_focus": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string"
+                },
+                "links": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "summary"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "code_url": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title",
+                    "authors",
+                    "venue",
+                    "year"
+                ]
+            }
+        },
+        "current_research": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "funding": {
+                        "type": "string"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date"
+                    }
+                },
+                "required": [
+                    "title",
+                    "description"
+                ]
+            }
+        },
+        "teaching": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "course_name": {
+                        "type": "string"
+                    },
+                    "course_number": {
+                        "type": "string"
+                    },
+                    "semester": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "schedule": {
+                        "type": "string"
+                    },
+                    "location": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "course_name",
+                    "semester",
+                    "year"
+                ]
+            }
+        },
+        "honors_awards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "date_range": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "award",
+                            "position"
+                        ]
+                    }
+                },
+                "required": [
+                    "title",
+                    "type"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema extends v4 by adding a 'links' field to the 'research_focus' section to store links to various profiles.  The 'honors_awards' section now includes a 'type' field to distinguish between awards and positions.  All other fields remain consistent with v4."
+}

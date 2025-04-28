@@ -1,0 +1,60 @@
+{
+    "version": "v1",
+    "schema": {
+        "personal_background": {
+            "type": "string"
+        },
+        "affiliations": {
+            "type": "list",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "institution": {
+                        "type": "string"
+                    },
+                    "department": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "lab": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "institution",
+                    "title"
+                ]
+            }
+        },
+        "education": {
+            "type": "list",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "university": {
+                        "type": "string"
+                    },
+                    "country": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "university"
+                ]
+            }
+        },
+        "research_interests": {
+            "type": "list",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "documentation": "This schema defines the structure for an academic profile.  \n\n* `personal_background`: A free-text string describing the individual's background. \n* `affiliations`: A list of objects, each representing an affiliation. Each affiliation object includes the `institution`, `department`, `title`, and `lab` (optional). \n* `education`: A list of objects, each representing an educational degree. Each education object includes the `degree`, `university`, and `country`. \n* `research_interests`: A list of strings, each representing a research interest."
+}

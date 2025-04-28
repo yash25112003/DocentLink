@@ -1,0 +1,25 @@
+{
+    "metadata": {
+        "source_url": "https://jjbaek35.github.io",
+        "timestamp": "2025-04-29T01:02:46.309769",
+        "scraping_tool_used": "playwright",
+        "schema_version": "v1",
+        "status": "success"
+    },
+    "schema_documentation": "This schema defines the structure for an academic profile.  \n\n* `personal_background`: A free-text string describing the individual's background. \n* `affiliations`: A list of objects, each representing an affiliation. Each affiliation object includes the `institution`, `department`, `title`, and `lab` (optional). \n* `education`: A list of objects, each representing an educational degree. Each education object includes the `degree`, `university`, and `country`. \n* `research_interests`: A list of strings, each representing a research interest.",
+    "quality_control": {
+        "completeness_score": 0.25,
+        "missing_required_fields": [],
+        "potential_duplicates": {},
+        "temporal_annotations": {},
+        "notes": [
+            "Low data completeness."
+        ]
+    },
+    "profile_data": {
+        "personal_background": "Hello, I am an Assistant Teaching Professor, working for SCAI and the SEFCOM lab at Arizona State University as. I received my Ph.D. from Yonsei University in South Korea. My research interests lie in mobile and wireless network security issues like Telco (5G), Access Control, Blockchain, Digital Forensics, and Vehicle security. 📫 jaejong at asu . edu",
+        "affiliations": null,
+        "education": null,
+        "research_interests": null
+    }
+}
