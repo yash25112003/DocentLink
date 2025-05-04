@@ -26,53 +26,69 @@ LLM_RETRY_DELAY = 5 # seconds
 # --- Scraping Tool Configurations ---
 
 # Firecrawl Configuration
-FIRECRAWL_PARAMS = {
+# Note: Parameters passed directly in scrape_url call now, this dict is for reference
+FIRECRAWL_CONFIG_REFERENCE = {
     'pageOptions': {
-        'onlyMainContent': False, # Get full page content initially
-        'includeHtml': False,     # Prefer Markdown for easier section parsing
-        'includeMarkdown': True,
-        'includeJson': False,     # Set to True if JSON parsing is preferred over Markdown
-        'screenshot': False,
-        # 'waitFor': 3000, # Optional: wait time in ms
+        'onlyMainContent': False,
+        'formats': ['markdown', 'html', 'data'],
+        'waitFor': 3000
     },
     'crawlerOptions': {
-        # 'includes': [], # Optional: Regex patterns for allowed URLs if crawling multiple pages
-        # 'excludes': [], # Optional: Regex patterns for excluded URLs
-        # 'maxDepth': 1, # Optional: Crawl depth
+        'maxDepth': 1
     }
 }
-FIRECRAWL_TIMEOUT = 120 # seconds
+FIRECRAWL_TIMEOUT = 150 # seconds
 
 # Browser-Use Configuration
-# Defines how browser-use should interact with pages.
-# This is a simplified representation; actual implementation depends heavily
-# on the browser-use library's specific API and capabilities.
 BROWSER_USE_CONFIG = {
     'interaction_patterns': {
-        # CSS selectors for elements to interact with automatically
-        'cookie_consent': ['button#accept-cookies', '.cookie-banner .accept', '[id*="cookie"] button:contains("Accept")', '[class*="consent"] button'],
-        'load_more': ['button.load-more', 'a.show-more', 'button:contains("Load More")', 'button:contains("Show More")'],
-        'expand_sections': ['.expand-button', '.section-header button', '[aria-expanded="false"]'],
+        # *** CORRECTED SELECTORS for Playwright/Standard CSS ***
+        'cookie_consent': [
+            'button:has-text("Accept all")', # More specific first
+            'button:has-text("Accept")',
+            'button:has-text("Agree")',
+            'button:has-text("Consent")',
+            'button:has-text("Allow")',
+            'button:has-text("OK")',
+            'button:has-text("Okay")',
+            'button:has-text("Got it")',
+            'button:text-matches("accept", "i")', # Case-insensitive using Playwright regex
+            '[id*="cookie"] button:text-matches("accept", "i")', # Case-insensitive
+            '[class*="consent"] button:text-matches("accept", "i")', # Case-insensitive
+            '[role="button"]:text-matches("accept", "i")',
+            # Add other common patterns if needed
+        ],
+        'load_more': [
+            'button:has-text("Load More")',
+            'button:has-text("Show More")',
+            'a:has-text("Load More")',
+            'a:has-text("Show More")',
+            'button:text-matches("load more", "i")',
+            'button:text-matches("show more", "i")',
+        ],
+        'expand_sections': [
+            '.expand-button',
+            '.section-header button',
+            '[aria-expanded="false"]',
+            'button:has-text("Read more")'
+        ],
     },
     'element_prioritization': {
-        # CSS selectors for key content sections to prioritize extraction
-        # These might be used by browser-use or by our processing logic if browser-use returns full HTML
+        # CSS selectors for key content sections
         'publications': ['.publications-list', 'div#publications', 'ul.pub-items', 'section[id*="publication"]'],
         'research_focus': ['.research-interests', 'section#research', 'div.research-areas', 'section[id*="research"]'],
         'teaching': ['.courses-taught', 'section#teaching', 'section[id*="teaching"]'],
-        'biography': ['section#about', 'div.bio', 'section[id*="biography"]'],
-        # Add more mappings based on SECTION_KEYWORDS below
+        'biography': ['section#about', 'div.bio', 'section[id*="biography"]', '#bio', '#about'],
     },
-    'extraction_strategy': 'markdown', # Preferred output: 'markdown', 'html', or 'structured' (if supported)
+    'extraction_strategy': 'markdown', # Preferred output: 'markdown', 'html', or 'structured'
     'timeout': 180, # seconds
-    'use_proxy': bool(BRIGHTDATA_WSS_URL), # Flag to indicate if proxy should be used
+    'use_proxy': bool(BRIGHTDATA_WSS_URL),
     'proxy_url': BRIGHTDATA_WSS_URL
-    # Add other browser-use specific configurations if needed
 }
 
 # Playwright Configuration
-PLAYWRIGHT_TIMEOUT = 180 * 1000 # milliseconds
-PLAYWRIGHT_HEADLESS = True # Run in headless mode
+PLAYWRIGHT_TIMEOUT = 180 * 1000 # milliseconds (used for page navigation/actions)
+PLAYWRIGHT_HEADLESS = True
 PLAYWRIGHT_USE_PROXY = bool(BRIGHTDATA_WSS_URL)
 PLAYWRIGHT_PROXY_CONFIG = {
     "server": BRIGHTDATA_WSS_URL
@@ -81,12 +97,13 @@ PLAYWRIGHT_PROXY_CONFIG = {
 
 # --- Content Validation Thresholds ---
 MIN_CONTENT_LENGTH = 150 # Minimum characters expected in combined *cleaned* sections
-REQUIRED_SECTIONS = ['personal_background', 'research_focus', 'publications'] # Sections considered essential for adequacy
+# Sections that trigger a *warning* if missing, but don't stop processing if length > MIN_CONTENT_LENGTH
+REQUIRED_SECTIONS = ['personal_background', 'research_focus', 'publications']
 
 # --- Semantic Section Keywords ---
-# Maps internal field names to potential variations found on web pages
+# (Keep this section as is)
 SECTION_KEYWORDS = {
-    'personal_background': ["biography", "about me", "cv", "curriculum vitae", "personal statement", "background", "profile", "about"],
+    'personal_background': ["biography", "about me", "cv", "curriculum vitae", "personal statement", "background", "profile", "about", "introduction"],
     'research_focus': ["research interests", "research area", "specializations", "expertise", "focus areas", "research", "scholarly interests"],
     'publications': ["publications", "papers", "journal articles", "conference proceedings", "peer-reviewed works", "publications list", "selected works", "bibliography", "academic writings", "articles", "presentations"],
     'current_research': ["ongoing research", "work in progress", "current studies", "active investigations", "current projects"],
@@ -100,8 +117,8 @@ SECTION_KEYWORDS = {
     'links': ["links", "profiles", "external links", "google scholar", "orcid", "linkedin", "website", "social media"],
     'service': ["service", "committees", "professional service", "university service", "editorial boards"],
     'students_mentoring': ["students", "mentoring", "advisees", "lab members", "research group"],
-    # Add more granular sections as needed
 }
+
 
 # --- Logging Configuration ---
 LOGGING_CONFIG = {
@@ -116,7 +133,13 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(SCHEMA_HISTORY_DIR, exist_ok=True)
 
 # --- Initialize Logging ---
-logging.basicConfig(**LOGGING_CONFIG)
-logger = logging.getLogger(__name__)
+# Basic config should be called once, preferably in main.py or the entry script
+# logging.basicConfig(**LOGGING_CONFIG) # Comment out/remove if called elsewhere
+logger = logging.getLogger(__name__) # Get logger instance
 
-logger.info("Configuration loaded.")
+# Log loading confirmation - adjust if logging is set up in entry script
+if not logging.getLogger().hasHandlers():
+     logging.basicConfig(**LOGGING_CONFIG)
+     logger.info("Config: Configuration loaded (logging initialized here).")
+else:
+    logger.info("Config: Configuration loaded.")

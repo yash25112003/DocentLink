@@ -1,0 +1,188 @@
+{
+    "version": "v8",
+    "schema": {
+        "research_focus": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string"
+                },
+                "links": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "url"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "summary"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "blog_url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "authors",
+                    "venue",
+                    "year"
+                ]
+            }
+        },
+        "current_research": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "funding": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "source": {
+                                    "type": "string"
+                                },
+                                "award_number": {
+                                    "type": "string"
+                                },
+                                "start_date": {
+                                    "type": "string",
+                                    "format": "date"
+                                },
+                                "end_date": {
+                                    "type": "string",
+                                    "format": "date"
+                                }
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "title",
+                    "description"
+                ]
+            }
+        },
+        "teaching": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "course_name": {
+                        "type": "string"
+                    },
+                    "course_number": {
+                        "type": "string"
+                    },
+                    "semester": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "schedule": {
+                        "type": "string"
+                    },
+                    "location": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "course_name",
+                    "semester",
+                    "year"
+                ]
+            }
+        },
+        "honors_awards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "date_range": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "award",
+                            "position"
+                        ]
+                    },
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "type"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema (v8) extends v7 by adding a `blog_url` field to the `publications` section to accommodate blog post mentions.  The `current_research` section's funding information is restructured into an array of objects, each representing a funding source, for better flexibility. The `honors_awards` section remains largely the same, but the structure is now better suited to handle both awards and positions."
+}

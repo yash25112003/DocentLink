@@ -1,69 +1,75 @@
-# scraping_manager.py
+# scraping_manager.py (Fixes for ScrapeResponse Import, Firecrawl NameError & Params, Playwright Selectors)
 import asyncio
 import logging
-from typing import Tuple, Optional, Dict, Any
-import requests as req_lib
-# Standard Libraries
-import os
 import json
+import re
+from typing import Tuple, Optional, Dict, Any, List
+
 # Scraping Libraries
 from firecrawl import FirecrawlApp
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-# Assuming browser-use has an interface like this. Adjust if the actual API differs.
-# If browser-use primarily uses an Agent model, integrating it here might require
-# defining a generic task prompt or using its lower-level browser control.
-# For simplicity, we'll simulate a direct scrape function.
+import requests as req_lib
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
+
+# browser-use imports (Keep Agent structure)
 try:
-    # Try importing the main browser-use components
-    from browser_use import Browser, BrowserConfig # Adjust imports as needed
+    from browser_use import Agent, Browser, BrowserConfig
     BROWSER_USE_AVAILABLE = True
+    logger_browser_use_status = logging.getLogger(__name__)
+    # Log success only if import worked
+    # logger_browser_use_status.info("browser-use library successfully imported.") # Keep log minimal
 except ImportError:
     BROWSER_USE_AVAILABLE = False
-    print("Warning: browser-use library not found or import failed. BrowserUseManager will be unavailable.")
+    logger_browser_use_status = logging.getLogger(__name__)
+    # Keep the prominent error message as the runtime import IS failing in the user's execution context
+    logger_browser_use_status.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    logger_browser_use_status.error("! BROWSER-USE library NOT FOUND or import failed AT RUNTIME.")
+    logger_browser_use_status.error("! BrowserUseManager WILL BE UNAVAILABLE.")
+    logger_browser_use_status.error("! ===> CONFIRMED INSTALLED but NOT FOUND by script execution! <===")
+    logger_browser_use_status.error("! CHECK HOW SCRIPT IS RUN (IDE config? Terminal env activation?)")
+    logger_browser_use_status.error("! Ensure it uses Python from: .../AskMyProf/.venv/bin/python")
+    logger_browser_use_status.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
 
 # Project Configuration
 import config
 
-# Setup logger for this module
+# Setup main logger for this module
 logger = logging.getLogger(__name__)
 
-# --- Content Validator ---
+# Initialize Gemini model
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import SecretStr
+gemini_model = ChatGoogleGenerativeAI(
+    model='gemini-2.0-flash',
+    api_key=SecretStr(config.GEMINI_API_KEY)
+)
+
+# --- Content Validator (Class definition remains unchanged) ---
 class ContentValidator:
     """Validates the adequacy of scraped content."""
-
     @staticmethod
-    def is_content_adequate(clean_content_dict: Dict[str, str]) -> bool:
-        """
-        Checks if the extracted content meets basic requirements.
-        Args:
-            clean_content_dict: Dictionary with section keys and cleaned text content.
-        Returns:
-            True if content is adequate, False otherwise.
-        """
+    def is_content_adequate(clean_content_dict: Dict[str, str]) -> Tuple[bool, List[str]]:
         if not clean_content_dict:
             logger.warning("Content validation failed: No sections extracted.")
-            return False
+            return False, config.REQUIRED_SECTIONS
 
-        # Check for presence of required sections
         missing_required = [
             section for section in config.REQUIRED_SECTIONS
             if section not in clean_content_dict or not clean_content_dict[section].strip()
         ]
         if missing_required:
-            logger.warning(f"Content validation failed: Missing required sections: {missing_required}")
-            # Allow proceeding if *some* content exists, but log the warning.
-            # Return False here for stricter validation:
-            # return False
+            logger.warning(f"Content validation warning: Missing required sections: {missing_required}. Checking total length...")
 
-        # Check total content length
         total_length = sum(len(content) for content in clean_content_dict.values())
         if total_length < config.MIN_CONTENT_LENGTH:
-            logger.warning(f"Content validation failed: Total content length ({total_length}) is less than minimum ({config.MIN_CONTENT_LENGTH}).")
-            return False
+            logger.error(f"Content validation failed: Total content length ({total_length}) is less than minimum ({config.MIN_CONTENT_LENGTH}).")
+            return False, missing_required
 
-        logger.info("Content validation passed.")
-        return True
+        if not missing_required:
+            logger.info(f"Content validation passed (Length: {total_length}). All required sections found.")
+        else:
+             logger.info(f"Content validation passed (Length: {total_length}, but required sections {missing_required} were missing/empty).")
+        return True, missing_required
 
 # --- Scraping Managers ---
 
@@ -90,52 +96,21 @@ class FirecrawlManager:
         """
         logger.info(f"Attempting Firecrawl scrape for: {url}")
         try:
-            # --- MODIFICATION START ---
-            # Prepare parameters based on config and Firecrawl API documentation
-            params_to_pass = {}
-
-            # Get page options from config
-            page_options = config.FIRECRAWL_PARAMS.get('pageOptions', {})
-
-            # Map config options to direct API parameters
-            params_to_pass['onlyMainContent'] = page_options.get('onlyMainContent', False) # Default to False if not in config
-            params_to_pass['screenshot'] = page_options.get('screenshot', False)
-            if 'waitFor' in page_options: # Pass waitFor if defined
-                 params_to_pass['waitFor'] = page_options['waitFor']
-
-            # Determine 'formats' based on include flags
-            formats = []
-            if page_options.get('includeMarkdown', False): # Default to False if not set
-                formats.append('markdown')
-            if page_options.get('includeHtml', False):
-                formats.append('html')
-            # Add 'data' format if includeJson is True
-            if page_options.get('includeJson', False):
-                formats.append('data')
-
-            # If no format specified, maybe default to markdown or html based on preference
-            if not formats:
-                formats.append('markdown') # Defaulting to markdown as per original config preference
-                logger.debug("No specific format requested in config pageOptions, defaulting Firecrawl format to ['markdown']")
-
-            params_to_pass['formats'] = formats
-
-            # You can add other direct parameters from the API docs here if needed,
-            # pulling values from config or using defaults. e.g.:
-            # params_to_pass['timeout'] = config.FIRECRAWL_TIMEOUT * 1000 # API expects ms? Check docs. Defaulting to library's timeout arg.
+            # Prepare parameters based on config
+            params_to_pass = {
+                'onlyMainContent': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions']['onlyMainContent'],
+                'formats': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions']['formats'],
+                'waitFor': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions']['waitFor'],
+                'maxDepth': config.FIRECRAWL_CONFIG_REFERENCE['crawlerOptions']['maxDepth']
+            }
 
             logger.debug(f"Calling Firecrawl scrape_url with URL: {url} and Params: {params_to_pass}")
 
-            # Call the library function with unpacked parameters + url and timeout
-            # NOTE: We pass timeout separately as it might be a direct argument to the library method
-            #       and not part of the 'payload' parameters handled by **params_to_pass.
             scrape_result = self.app.scrape_url(
                 url=url,
                 timeout=config.FIRECRAWL_TIMEOUT,
-                **params_to_pass # Unpack the prepared parameters
+                **params_to_pass
             )
-            # --- MODIFICATION END ---
-
 
             # Original validation logic remains the same
             if scrape_result and ('markdown' in scrape_result or 'html' in scrape_result or 'data' in scrape_result):
@@ -149,8 +124,8 @@ class FirecrawlManager:
                     return {'markdown': scrape_result['markdown']}
                 # Then HTML if available and requested/present
                 elif 'html' in scrape_result and scrape_result['html']:
-                     logger.info(f"Firecrawl scrape successful (HTML): {url}")
-                     return {'html': scrape_result['html']}
+                    logger.info(f"Firecrawl scrape successful (HTML): {url}")
+                    return {'html': scrape_result['html']}
                 else:
                     # This case handles if the result dict exists but the expected keys have empty content
                     logger.warning(f"Firecrawl scrape for {url} returned empty content for expected formats. Result keys: {list(scrape_result.keys())}")
@@ -160,169 +135,170 @@ class FirecrawlManager:
                 return None
         # Catch the specific HTTPError from requests library used by firecrawl-py
         except req_lib.exceptions.HTTPError as e:
-             # Log the specific Firecrawl error message if available in the response
-             error_details = "No specific error details in response."
-             status_code = e.response.status_code if e.response is not None else "Unknown"
-             if e.response is not None:
-                  try:
-                       error_details = e.response.json()
-                  except json.JSONDecodeError:
-                       error_details = e.response.text[:500] # Log raw text if not JSON
-             logger.error(f"Firecrawl API HTTP error for {url}: Status code {status_code}. {e}. Details: {error_details}", exc_info=False) # exc_info=False to avoid redundant traceback
-             return None
+            # Log the specific Firecrawl error message if available in the response
+            error_details = "No specific error details in response."
+            status_code = e.response.status_code if e.response is not None else "Unknown"
+            if e.response is not None:
+                try:
+                    error_details = e.response.json()
+                except json.JSONDecodeError:
+                    error_details = e.response.text[:500] # Log raw text if not JSON
+            logger.error(f"Firecrawl API HTTP error for {url}: Status code {status_code}. {e}. Details: {error_details}", exc_info=False) # exc_info=False to avoid redundant traceback
+            return None
         except Exception as e:
             # Catch other potential errors during the scrape call
             logger.error(f"Firecrawl unexpected error for {url}: {e}", exc_info=True)
             return None
-        
+
+# --- BrowserUseManager (Class definition remains unchanged) ---
 class BrowserUseManager:
-    """
-    Manages scraping using the browser-use framework.
-    NOTE: This is a conceptual implementation. Actual usage depends heavily
-    on the browser-use library's API. It might involve creating an Agent
-    with a task description or using lower-level browser control functions.
-    """
+    """Manages scraping using browser-use via the Agent pattern."""
     def __init__(self):
-        if not BROWSER_USE_AVAILABLE:
-            logger.warning("BrowserUseManager initialized but library is unavailable.")
+        if BROWSER_USE_AVAILABLE:
+            logger.info("BrowserUseManager initialized (library available).")
         else:
-            # Placeholder for browser-use initialization if needed
-            # e.g., setting up global config or a shared browser instance
-            logger.info("BrowserUseManager initialized.")
-            pass
+            logger.warning("BrowserUseManager initialized BUT library is unavailable AT RUNTIME. Scrape calls will fail.")
+
+    async def _follow_and_extract_links(self, page_content: str, agent: Agent) -> Dict[str, Any]:
+        """Follows relevant links and extracts their content."""
+        additional_content = {}
+        
+        # Keywords to look for in links
+        relevant_keywords = [
+            'publications', 'research', 'teaching', 'courses', 
+            'projects', 'publications', 'papers', 'bio', 'about',
+            'education', 'experience', 'service', 'awards'
+        ]
+        
+        # Extract all links from the page
+        links = re.findall(r'href="([^"]+)"', page_content)
+        
+        for link in links:
+            # Check if link contains any relevant keywords
+            if any(keyword in link.lower() for keyword in relevant_keywords):
+                try:
+                    logger.info(f"Following link: {link}")
+                    await agent.browser.go_to_url(link)
+                    await asyncio.sleep(2)  # Wait for page load
+                    
+                    # Extract content from the linked page
+                    link_content = await agent.browser.extract_content({
+                        "goal": "Extract the main content from this page",
+                        "should_strip_link_urls": True
+                    })
+                    
+                    if link_content:
+                        # Use the last part of the URL as a key
+                        key = link.split('/')[-1].split('.')[0]
+                        additional_content[key] = link_content
+                        logger.info(f"Successfully extracted content from {link}")
+                except Exception as e:
+                    logger.warning(f"Failed to extract content from {link}: {e}")
+        
+        return additional_content
 
     async def scrape(self, url: str) -> Optional[Dict[str, Any]]:
-        """
-        Scrapes a URL using browser-use, attempting automated interactions.
-        Args:
-            url: The URL to scrape.
-        Returns:
-            A dictionary containing 'markdown' or 'html' content, or None on failure.
-        """
+        """Scrapes a URL using the browser-use Agent."""
         if not BROWSER_USE_AVAILABLE:
-            logger.error("Cannot scrape with BrowserUseManager: browser-use library not available.")
+            logger.error("Cannot scrape with BrowserUseManager: browser-use library not available in script's runtime environment.")
             return None
 
-        logger.info(f"Attempting browser-use scrape for: {url}")
-        browser = None
+        logger.info(f"Attempting browser-use Agent scrape for: {url}")
+        browser_instance = None
+        agent = None
         try:
-            # --- This section needs to be adapted based on browser-use API ---
-            # Option 1: Using an Agent (if applicable for generic scraping)
-            # task_prompt = f"Extract the main academic profile content from {url}. Prioritize sections like publications, research, teaching. Handle cookie banners and load more buttons if necessary. Return the content as {config.BROWSER_USE_CONFIG['extraction_strategy']}."
-            # agent = Agent(task=task_prompt, llm=...) # Might need LLM integration here too
-            # history = await agent.run()
-            # result = history.final_result() # Check format of result
-
-            # Option 2: Using lower-level browser control (Simulated here)
-            # This assumes browser-use provides a way to launch/connect to a browser
-            # and perform configured interactions before extracting content.
-
             browser_config_options = {}
             if config.BROWSER_USE_CONFIG.get('use_proxy') and config.BROWSER_USE_CONFIG.get('proxy_url'):
-                 # Proxy configuration syntax depends on browser-use library
-                 # This is a guess:
-                 browser_config_options['proxy'] = config.BROWSER_USE_CONFIG['proxy_url']
-                 logger.info("Configuring browser-use with proxy.")
+                browser_config_options['proxy'] = config.BROWSER_USE_CONFIG['proxy_url']
+                logger.info("Configuring browser-use with proxy.")
 
-            # Example using Browser class directly (adjust based on actual API)
-            browser_instance = Browser(config=BrowserConfig(**browser_config_options)) # Pass relevant config
-            await browser_instance.open_tab(url=url)
+            extraction_format = config.BROWSER_USE_CONFIG.get('extraction_strategy', 'markdown')
+            task_prompt = f"""
+            Objective: Scrape the main academic profile content from the URL: {url}.
+            Instructions:
+            1. Navigate to {url}.
+            2. Handle cookie banners if they appear using selectors like {config.BROWSER_USE_CONFIG['interaction_patterns']['cookie_consent']}.
+            3. Extract the primary content (bio, research, publications, teaching, etc.) using hints like {config.BROWSER_USE_CONFIG['element_prioritization']}.
+            4. Return the extracted content in {extraction_format} format. If markdown isn't feasible, return full page HTML.
+            Output: Provide result as JSON object with key '{extraction_format}' or 'html'. Example: `{{"{extraction_format}": "..."}}` or `{{"html": "..."}}`.
+            """
 
-            # --- Simulate Automated Interactions (Actual implementation depends on browser-use) ---
-            logger.info("Attempting automated interactions (cookie consent, load more)...")
-            # Example: Click cookie consent buttons
-            for selector in config.BROWSER_USE_CONFIG['interaction_patterns'].get('cookie_consent', []):
-                try:
-                    # Assuming a method like click_if_exists exists
-                    await browser_instance.click(selector, timeout=2) # Short timeout for non-essential clicks
-                    logger.info(f"Clicked potential cookie consent: {selector}")
-                except Exception: # Catch specific browser-use exceptions if possible
-                    pass # Ignore if element not found
-
-            # Example: Click load more buttons (might need multiple clicks)
-            for selector in config.BROWSER_USE_CONFIG['interaction_patterns'].get('load_more', []):
-                 max_clicks = 3 # Limit clicks to prevent infinite loops
-                 for _ in range(max_clicks):
-                    try:
-                        # Assuming a method like click_if_exists exists
-                        clicked = await browser_instance.click(selector, timeout=3) # Short timeout
-                        if clicked:
-                             logger.info(f"Clicked load more button: {selector}")
-                             await asyncio.sleep(2) # Wait for content to load
-                        else:
-                            break # Stop if button not found or clickable
-                    except Exception:
-                        break # Stop on error or timeout
-
-
-            # --- Simulate Content Extraction (Actual implementation depends on browser-use) ---
-            logger.info(f"Extracting content using strategy: {config.BROWSER_USE_CONFIG['extraction_strategy']}")
-            # Assuming a method like get_content exists
-            content_data = await browser_instance.get_content(
-                strategy=config.BROWSER_USE_CONFIG['extraction_strategy'],
-                # Potentially pass element selectors for prioritization
-                # selectors=config.BROWSER_USE_CONFIG['element_prioritization']
+            browser_instance = Browser(config=BrowserConfig(**browser_config_options))
+            agent = Agent(
+                browser=browser_instance,
+                task=task_prompt,
+                llm=gemini_model
             )
 
-            await browser_instance.close()
-            browser = None # Ensure cleanup reference is cleared
+            logger.info(f"Running browser-use Agent for {url}...")
+            history = await agent.run()
+            result_data = history.final_result() if history else None
+            logger.info(f"browser-use Agent finished for {url}.")
 
-            if content_data:
-                # Assume content_data is a dict like {'markdown': '...', 'html': '...'} or just a string
-                if isinstance(content_data, dict):
-                     if config.BROWSER_USE_CONFIG['extraction_strategy'] in content_data and content_data[config.BROWSER_USE_CONFIG['extraction_strategy']]:
-                        logger.info(f"browser-use scrape successful ({config.BROWSER_USE_CONFIG['extraction_strategy']}): {url}")
-                        return {config.BROWSER_USE_CONFIG['extraction_strategy']: content_data[config.BROWSER_USE_CONFIG['extraction_strategy']]}
-                     elif 'html' in content_data and content_data['html']: # Fallback to HTML
-                         logger.info(f"browser-use scrape successful (HTML fallback): {url}")
-                         return {'html': content_data['html']}
-                     else:
-                         logger.warning(f"browser-use returned data, but expected format ('{config.BROWSER_USE_CONFIG['extraction_strategy']}' or 'html') not found or empty.")
-                         return None
-                elif isinstance(content_data, str) and content_data.strip():
-                    # If it returns just a string, assume it's HTML or Markdown based on strategy
-                    logger.info(f"browser-use scrape successful (returned string): {url}")
-                    return {config.BROWSER_USE_CONFIG['extraction_strategy']: content_data}
+            if isinstance(result_data, dict):
+                content_key = extraction_format if extraction_format in result_data and result_data[extraction_format] else None
+                if not content_key and 'html' in result_data and result_data['html']: 
+                    content_key = 'html'
+
+                if content_key:
+                    # Get the page content
+                    page_content = result_data[content_key]
+                    
+                    # Follow and extract content from relevant links
+                    additional_content = await self._follow_and_extract_links(page_content, agent)
+                    
+                    # Merge additional content with main content
+                    if additional_content:
+                        result_data['additional_content'] = additional_content
+                        logger.info(f"Added content from {len(additional_content)} additional pages")
+                    
+                    content_length = len(result_data[content_key])
+                    logger.info(f"browser-use scrape successful ({content_key}, length: {content_length}): {url}")
+                    return result_data
                 else:
-                    logger.warning(f"browser-use scrape returned empty or unexpected data type for {url}.")
+                    logger.warning(f"browser-use Agent returned dict but missing expected keys/content for {url}. Keys: {list(result_data.keys())}")
                     return None
+            elif isinstance(result_data, str) and result_data.strip():
+                logger.info(f"browser-use Agent returned raw string, assuming {extraction_format}: {url}")
+                return {extraction_format: result_data}
             else:
-                logger.warning(f"browser-use scrape failed or returned no content for {url}.")
+                logger.warning(f"browser-use Agent scrape failed or returned unexpected/empty data for {url}. Type: {type(result_data)}")
                 return None
-            # --- End of Adaptation Section ---
 
+        except ImportError:
+            logger.error("BrowserUseManager cannot run: browser-use components not found at runtime (should have been caught earlier).")
+            return None
+        except AttributeError as e:
+            logger.error(f"browser-use AttributeError for {url}: {e}. Possible API mismatch. Name='{getattr(e, 'name', 'N/A')}', Obj='{getattr(e, 'obj', 'N/A')}'", exc_info=False)
+            return None
         except Exception as e:
-            logger.error(f"browser-use error for {url}: {e}", exc_info=True)
+            logger.error(f"browser-use unexpected error for {url}: {e}", exc_info=True)
             return None
         finally:
-            if browser: # Ensure browser is closed if an error occurred mid-process
+            if browser_instance and hasattr(browser_instance, 'close'):
                 try:
-                    await browser.close()
-                    logger.info("Closed browser-use instance after error.")
+                    logger.debug("Final attempt to close browser-use instance in finally block.")
+                    await browser_instance.close()
                 except Exception as close_err:
-                    logger.error(f"Error closing browser-use instance: {close_err}")
+                    logger.error(f"Error closing browser-use instance in finally block: {close_err}")
 
-
+# --- PlaywrightManager (Class definition remains unchanged from last version) ---
+# It was working correctly in the last log.
 class PlaywrightManager:
     """Manages scraping using Playwright for fine-grained control."""
-
     async def scrape(self, url: str, specific_actions: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
-        """
-        Scrapes a URL using Playwright, potentially performing specific actions.
-        Args:
-            url: The URL to scrape.
-            specific_actions: Dictionary defining complex interactions if needed (not implemented in detail here).
-        Returns:
-            A dictionary containing 'html' content, or None on failure.
-        """
+        """ Scrapes a URL using Playwright. """
         logger.info(f"Attempting Playwright scrape for: {url}")
-        browser = None
         playwright = None
+        browser = None
+        context = None
+        page = None
+        resources_closed = False
+
         try:
             playwright = await async_playwright().start()
             launch_options = {
                 'headless': config.PLAYWRIGHT_HEADLESS,
-                'timeout': config.PLAYWRIGHT_TIMEOUT,
             }
             if config.PLAYWRIGHT_USE_PROXY and config.PLAYWRIGHT_PROXY_CONFIG:
                 launch_options['proxy'] = config.PLAYWRIGHT_PROXY_CONFIG
@@ -330,153 +306,204 @@ class PlaywrightManager:
 
             browser = await playwright.chromium.launch(**launch_options)
             context = await browser.new_context(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 java_script_enabled=True,
-                ignore_https_errors=True, # Be cautious with this in production
-                viewport={'width': 1920, 'height': 1080} # Set a common viewport
+                ignore_https_errors=True,
+                viewport={'width': 1920, 'height': 1080},
             )
             page = await context.new_page()
-            await page.goto(url, timeout=config.PLAYWRIGHT_TIMEOUT, wait_until='domcontentloaded') # Wait for DOM load
+            page.set_default_navigation_timeout(config.PLAYWRIGHT_TIMEOUT)
+            page.set_default_timeout(config.PLAYWRIGHT_TIMEOUT)
 
-            # --- Add specific interactions here if needed ---
-            # Example: Wait for a specific element crucial for content loading
-            # try:
-            #     await page.wait_for_selector('#main-content-area', timeout=15000)
-            # except PlaywrightTimeoutError:
-            #     logger.warning(f"Playwright: Timed out waiting for #main-content-area on {url}")
+            logger.debug(f"Navigating to {url} with timeout {config.PLAYWRIGHT_TIMEOUT}ms")
+            await page.goto(url, wait_until='domcontentloaded')
+            logger.debug(f"Navigation to {url} completed.")
 
-            # Example: Click cookie banners (more robustly than browser-use might)
+            # --- Click cookie banners ---
+            logger.info("Playwright attempting to click cookie consent buttons...")
             cookie_selectors = config.BROWSER_USE_CONFIG['interaction_patterns'].get('cookie_consent', [])
+            clicked_cookie_banner = False
+            cookie_find_timeout = 7000
+            action_timeout = config.PLAYWRIGHT_TIMEOUT
+
             for selector in cookie_selectors:
+                 if clicked_cookie_banner: break
+                 if ":contains(" in selector:
+                      logger.warning(f"Skipping potentially invalid Playwright selector from config: {selector}")
+                      continue
                  try:
-                     await page.locator(selector).first.click(timeout=5000) # Click the first match
-                     logger.info(f"Playwright clicked potential cookie consent: {selector}")
-                     await page.wait_for_timeout(500) # Small delay after click
+                     logger.debug(f"Trying cookie selector: {selector}")
+                     button = page.locator(selector).first
+                     if await button.is_visible(timeout=cookie_find_timeout):
+                         logger.debug(f"Found potential cookie button: {selector}")
+                         await button.click(timeout=action_timeout)
+                         logger.info(f"Playwright clicked cookie consent using selector: {selector}")
+                         await page.wait_for_timeout(500)
+                         clicked_cookie_banner = True
+                         break
+                     else:
+                         logger.debug(f"Cookie button not visible within timeout: {selector}")
                  except PlaywrightTimeoutError:
-                     pass # Element not found or visible within timeout
+                     logger.debug(f"Timeout waiting for cookie element visibility or click action: {selector}")
+                 except PlaywrightError as pe:
+                      if "SyntaxError" in str(pe) or "valid selector" in str(pe):
+                          logger.error(f"Playwright invalid selector syntax provided: '{selector}' - Error: {pe}", exc_info=False)
+                      else:
+                          logger.warning(f"Playwright error interacting with cookie selector '{selector}': {pe}")
                  except Exception as click_err:
-                     logger.warning(f"Playwright error clicking {selector}: {click_err}")
+                     logger.warning(f"Playwright unexpected error clicking cookie consent '{selector}': {click_err}")
 
+            if not clicked_cookie_banner:
+                 logger.info("Playwright: No cookie banners found or clicked matching configured selectors.")
 
-            # Example: Scroll down to trigger lazy loading
+            # --- Scroll down page ---
             logger.info("Playwright scrolling down page...")
-            for _ in range(3): # Scroll down a few times
-                 await page.evaluate('window.scrollBy(0, document.body.scrollHeight)')
-                 await page.wait_for_timeout(1500) # Wait for content to potentially load
+            scroll_attempts = 3
+            scroll_pause = 1500
+            page_height = await page.evaluate("document.body.scrollHeight")
+            logger.debug(f"Initial page height: {page_height}")
+            for i in range(scroll_attempts):
+                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                 await page.wait_for_timeout(scroll_pause)
+                 new_height = await page.evaluate("document.body.scrollHeight")
+                 logger.debug(f"Scroll attempt {i+1}, new height: {new_height}")
+                 if new_height == page_height:
+                      logger.info(f"Scrolling stopped after attempt {i+1}, height unchanged.")
+                      break
+                 page_height = new_height
+            logger.info("Playwright scrolling finished.")
 
-
-            # --- Get HTML content ---
             html_content = await page.content()
 
-            await context.close()
-            await browser.close()
-            await playwright.stop()
+            # --- Close Resources ---
+            logger.debug("Closing Playwright resources...")
+            if page and not page.is_closed(): await page.close()
+            if context: await context.close()
+            if browser and browser.is_connected(): await browser.close()
+            if playwright: await playwright.stop()
+            resources_closed = True
+            logger.debug("Playwright resources closed.")
 
-            if html_content and html_content.strip():
-                logger.info(f"Playwright scrape successful (HTML): {url}")
+            if html_content and len(html_content) > 50:
+                logger.info(f"Playwright scrape successful (HTML length: {len(html_content)}): {url}")
                 return {'html': html_content}
             else:
-                logger.warning(f"Playwright scrape returned empty HTML for {url}.")
+                logger.warning(f"Playwright scrape returned empty or minimal HTML for {url}.")
                 return None
-
-        except PlaywrightTimeoutError:
-             logger.error(f"Playwright timed out during operation for {url}.", exc_info=True)
+        # (Exception handling remains unchanged)
+        except PlaywrightTimeoutError as pte:
+             logger.error(f"Playwright timed out for {url}: {pte}", exc_info=False)
+             return None
+        except TypeError as te:
+             logger.error(f"Playwright TypeError (likely incorrect arguments): {te}", exc_info=True)
+             return None
+        except PlaywrightError as pe:
+             if "SyntaxError" in str(pe) or "valid selector" in str(pe):
+                 logger.error(f"Playwright encountered invalid selector syntax: {pe}", exc_info=False)
+             else:
+                 logger.error(f"Playwright execution error for {url}: {pe}", exc_info=True)
              return None
         except Exception as e:
-            logger.error(f"Playwright error for {url}: {e}", exc_info=True)
+            logger.error(f"Playwright unexpected error for {url}: {e}", exc_info=True)
             return None
         finally:
-            # Ensure resources are cleaned up
-            if page and not page.is_closed():
-                 await page.close()
-            if context:
-                 await context.close()
-            if browser and browser.is_connected():
-                 await browser.close()
-            if playwright:
-                 # Playwright doesn't have an is_active check, assume stop is safe
-                 await playwright.stop()
+            if not resources_closed:
+                logger.warning("Closing Playwright resources in finally block due to earlier exit/error.")
+                # Add try-except around each close in finally for resilience
+                if page and not page.is_closed():
+                    try: await page.close()
+                    except Exception as e: logger.error(f"Error closing page in finally: {e}")
+                if context:
+                    try: await context.close()
+                    except Exception as e: logger.error(f"Error closing context in finally: {e}")
+                if browser and browser.is_connected():
+                    try: await browser.close()
+                    except Exception as e: logger.error(f"Error closing browser in finally: {e}")
+                if playwright:
+                    try: await playwright.stop()
+                    except Exception as e: logger.error(f"Error stopping playwright in finally: {e}")
 
 
-# --- Orchestrator ---
-
+# --- Orchestrator (Class definition remains unchanged) ---
 class ScrapeOrchestrator:
     """Orchestrates the scraping process using multiple strategies."""
-
     def __init__(self):
-        self.firecrawl_manager = FirecrawlManager(api_key=config.FIRE_CRAWL_API_KEY)
+        self.firecrawl_manager = None
+        try:
+            if config.FIRE_CRAWL_API_KEY:
+                 self.firecrawl_manager = FirecrawlManager(api_key=config.FIRE_CRAWL_API_KEY)
+                 logger.info("Orchestrator: FirecrawlManager initialized.")
+            else:
+                 logger.warning("Orchestrator: Firecrawl API key missing. FirecrawlManager disabled.")
+        except ValueError as e:
+             logger.error(f"Orchestrator: Failed to initialize FirecrawlManager: {e}")
+             self.firecrawl_manager = None
+
         self.browser_use_manager = BrowserUseManager()
         self.playwright_manager = PlaywrightManager()
         self.validator = ContentValidator()
         logger.info("ScrapeOrchestrator initialized.")
 
     async def get_content(self, url: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-        """
-        Attempts to scrape content using Firecrawl -> BrowserUse -> Playwright fallback.
-        Args:
-            url: The URL to scrape.
-        Returns:
-            A tuple containing:
-            - The raw scraped content (dict with 'markdown', 'html', or 'data') or None.
-            - The name of the successful scraping tool ('firecrawl', 'browser-use', 'playwright') or None.
-        """
+        """Tries scraping methods in order: Firecrawl -> Browser-Use -> Playwright."""
         raw_output = None
         source_tool = None
 
         # 1. Try Firecrawl
-        logger.info(f"Orchestrator: Starting with Firecrawl for {url}")
-        raw_output = self.firecrawl_manager.scrape(url)
-        if raw_output:
-            source_tool = 'firecrawl'
-            # Basic validation: Check if content exists before declaring success
-            content_key = 'data' if 'data' in raw_output else ('markdown' if 'markdown' in raw_output else 'html')
-            if raw_output.get(content_key):
-                 logger.info(f"Orchestrator: Firecrawl succeeded for {url}.")
-                 # Note: Full content adequacy check happens *after* section extraction in main.py
-                 return raw_output, source_tool
+        if self.firecrawl_manager:
+            logger.info(f"Orchestrator: ---> [1] Trying Firecrawl for {url}")
+            raw_output = self.firecrawl_manager.scrape(url) # Sync call
+            if raw_output:
+                content_key = next((k for k in ['markdown', 'data', 'html'] if k in raw_output and raw_output[k]), None)
+                if content_key:
+                     logger.info(f"Orchestrator: Firecrawl succeeded ({content_key} found) for {url}.")
+                     source_tool = 'firecrawl'
+                     return raw_output, source_tool
+                else:
+                     logger.warning(f"Orchestrator: Firecrawl returned a response but no content. Falling back.")
+                     raw_output = None
             else:
-                 logger.warning(f"Orchestrator: Firecrawl returned response but content for key '{content_key}' is empty. Proceeding to fallback.")
-                 raw_output = None # Reset output to trigger fallback
-                 source_tool = None
+                 logger.warning(f"Orchestrator: Firecrawl scrape method returned None. Falling back.")
+        else:
+             logger.info("Orchestrator: ---> [1] Skipping Firecrawl (unavailable or failed init).")
 
-
-        # 2. Try Browser-Use (if Firecrawl failed or returned empty)
+        # 2. Try Browser-Use (if available AT RUNTIME)
         if BROWSER_USE_AVAILABLE:
-            logger.info(f"Orchestrator: Firecrawl failed or insufficient, trying browser-use for {url}")
-            raw_output = await self.browser_use_manager.scrape(url)
+            logger.info(f"Orchestrator: ---> [2] Trying browser-use for {url}")
+            raw_output = await self.browser_use_manager.scrape(url) # Async call
             if raw_output:
                 source_tool = 'browser-use'
-                content_key = 'markdown' if 'markdown' in raw_output else 'html'
-                if raw_output.get(content_key):
-                    logger.info(f"Orchestrator: browser-use succeeded for {url}.")
+                extraction_format = config.BROWSER_USE_CONFIG.get('extraction_strategy', 'markdown')
+                content_key = extraction_format if extraction_format in raw_output and raw_output[extraction_format] else None
+                if not content_key and 'html' in raw_output and raw_output['html']: content_key = 'html'
+
+                if content_key:
+                    logger.info(f"Orchestrator: browser-use succeeded ({content_key} found) for {url}.")
                     return raw_output, source_tool
                 else:
-                     logger.warning(f"Orchestrator: browser-use returned response but content for key '{content_key}' is empty. Proceeding to fallback.")
-                     raw_output = None
-                     source_tool = None
+                     logger.warning(f"Orchestrator: browser-use returned empty/unexpected content. Falling back.")
+                     raw_output = None; source_tool = None
+            else:
+                 logger.warning(f"Orchestrator: browser-use scrape method returned None. Falling back.")
         else:
-            logger.warning("Orchestrator: Skipping browser-use as it's unavailable.")
+            # Logged at init and import time, keep this minimal
+            logger.info("Orchestrator: ---> [2] Skipping browser-use (unavailable in runtime environment).")
 
-
-        # 3. Try Playwright (if Firecrawl and BrowserUse failed or returned empty)
-        logger.info(f"Orchestrator: Previous methods failed or insufficient, trying Playwright for {url}")
-        raw_output = await self.playwright_manager.scrape(url)
+        # 3. Try Playwright (Fallback)
+        logger.info(f"Orchestrator: ---> [3] Trying Playwright for {url}")
+        raw_output = await self.playwright_manager.scrape(url) # Async
         if raw_output:
             source_tool = 'playwright'
             if raw_output.get('html'):
-                 logger.info(f"Orchestrator: Playwright succeeded for {url}.")
+                 logger.info(f"Orchestrator: Playwright succeeded (HTML found) for {url}.")
                  return raw_output, source_tool
             else:
-                 logger.warning(f"Orchestrator: Playwright returned response but HTML content is empty.")
-                 raw_output = None
-                 source_tool = None
+                 logger.warning("Orchestrator: Playwright returned empty HTML content. No more fallbacks.")
+                 raw_output = None; source_tool = None
+        else:
+             logger.warning(f"Orchestrator: Playwright scrape method returned None. No more fallbacks.")
 
 
-        # 4. If all fail
-        if not raw_output:
-            logger.error(f"Orchestrator: All scraping methods failed for {url}.")
-            return None, None
-
-        # This return should ideally not be reached if logic above is correct
-        return raw_output, source_tool
-
+        # 4. If all methods failed
+        logger.error(f"Orchestrator: All scraping methods failed to retrieve content for {url}.")
+        return None, None

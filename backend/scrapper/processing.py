@@ -1,4 +1,5 @@
 # processing.py
+import json
 import logging
 import re
 from typing import Dict, Any, Optional, List, Tuple
@@ -30,42 +31,73 @@ class ContentExtractor:
         # Add more specific cleaning rules if needed
         return text
 
-    def _parse_markdown(self, md_content: str) -> Dict[str, str]:
-        """Parses Markdown content to extract sections based on headers."""
+    def _parse_markdown(self, markdown_text: str) -> Dict[str, str]:
+        """Extracts sections from markdown text using heading-based parsing."""
         sections = {}
-        current_header = None
+        current_section = None
         current_content = []
-
-        # Use Python-Markdown to convert to HTML first for easier structure parsing
-        # Alternatively, parse Markdown directly line-by-line (more complex)
-        try:
-            html_content = markdown.markdown(md_content)
-            soup = BeautifulSoup(html_content, 'lxml')
-
-            # Find headers (h1, h2, h3, etc.) and content following them
-            # This is a simplified approach; robust Markdown parsing is complex
-            for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'pre', 'code', 'blockquote', 'table']):
-                if element.name.startswith('h'):
-                    # If we have content for the previous header, store it
-                    if current_header and current_content:
-                        sections[current_header] = self._clean_text(" ".join(current_content))
-
-                    # Start new section
-                    current_header = self._clean_text(element.get_text())
-                    current_content = []
-                elif current_header:
-                    # Append content to the current section
-                    current_content.append(element.get_text())
-
-            # Store the last section
-            if current_header and current_content:
-                sections[current_header] = self._clean_text(" ".join(current_content))
-
-        except Exception as e:
-            logger.error(f"Error parsing Markdown content: {e}", exc_info=True)
-
-        logger.info(f"Extracted {len(sections)} potential sections from Markdown.")
-        return sections
+        
+        # Split the markdown into lines
+        lines = markdown_text.split('\n')
+        
+        for line in lines:
+            # Check for headings (both ATX and Setext styles)
+            if line.startswith('#') or (len(line) > 0 and all(c == '=' for c in line.strip()) or all(c == '-' for c in line.strip())):
+                # If we have a current section, save it
+                if current_section and current_content:
+                    sections[current_section] = '\n'.join(current_content).strip()
+                
+                # Start new section
+                current_section = line.strip('#=- ').lower()
+                current_content = []
+            else:
+                # Add line to current section if we have one
+                if current_section:
+                    current_content.append(line)
+        
+        # Save the last section
+        if current_section and current_content:
+            sections[current_section] = '\n'.join(current_content).strip()
+        
+        # If no sections were found, try to extract content based on common academic profile patterns
+        if not sections:
+            # Look for common academic profile sections
+            patterns = {
+                'biography': r'(?i)(?:bio|biography|about me|about)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+                'research': r'(?i)(?:research interests|research focus|research areas)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+                'publications': r'(?i)(?:publications|selected publications|recent publications)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+                'teaching': r'(?i)(?:teaching|courses|education)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+                'service': r'(?i)(?:service|professional service|academic service)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+                'awards': r'(?i)(?:awards|honors|achievements)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)'
+            }
+            
+            for section, pattern in patterns.items():
+                match = re.search(pattern, markdown_text, re.DOTALL)
+                if match:
+                    sections[section] = match.group(1).strip()
+        
+        # If still no sections, try to extract content between major headings
+        if not sections:
+            # Split by major headings (lines with multiple = or -)
+            parts = re.split(r'\n[-=]{3,}\n', markdown_text)
+            if len(parts) > 1:
+                for i, part in enumerate(parts):
+                    if i == 0:
+                        sections['introduction'] = part.strip()
+                    else:
+                        # Try to extract a section name from the first line
+                        first_line = part.split('\n')[0].strip()
+                        section_name = first_line.lower().replace(' ', '_')
+                        sections[section_name] = part.strip()
+        
+        # Clean up the sections
+        cleaned_sections = {}
+        for section, content in sections.items():
+            if content.strip():
+                cleaned_sections[section] = self._clean_text(content)
+        
+        logger.info(f"Extracted {len(cleaned_sections)} sections from markdown.")
+        return cleaned_sections
 
     def _parse_html(self, html_content: str) -> Dict[str, str]:
         """Parses HTML content to extract sections, potentially using hints."""
@@ -142,19 +174,34 @@ class ContentExtractor:
     def _parse_json_data(self, data: Any) -> Dict[str, str]:
         """Flattens and cleans structured JSON data into a dict for keyword matching."""
         sections = {}
+        
         def flatten(json_obj, prefix=''):
             if isinstance(json_obj, dict):
                 for k, v in json_obj.items():
                     new_key = f"{prefix}_{k}" if prefix else k
-                    flatten(v, new_key)
+                    if isinstance(v, (str, int, float, bool)):
+                        sections[new_key] = self._clean_text(str(v))
+                    elif isinstance(v, list):
+                        if all(isinstance(item, (str, int, float, bool)) for item in v):
+                            sections[new_key] = self._clean_text(", ".join(map(str, v)))
+                        elif all(isinstance(item, dict) for item in v):
+                            # Handle list of objects (like publications)
+                            for i, item in enumerate(v):
+                                flatten(item, f"{new_key}_{i}")
+                        else:
+                            sections[new_key] = self._clean_text(", ".join(map(str, v)))
+                    else:
+                        flatten(v, new_key)
             elif isinstance(json_obj, list):
-                # Handle lists: maybe join strings or process items individually
-                # For simplicity, join simple lists, skip complex ones for now
-                if all(isinstance(item, (str, int, float)) for item in json_obj):
-                     sections[prefix] = self._clean_text(", ".join(map(str, json_obj)))
-                # else: # Could try to flatten list items if they are dicts
+                if all(isinstance(item, (str, int, float, bool)) for item in json_obj):
+                    sections[prefix] = self._clean_text(", ".join(map(str, json_obj)))
+                elif all(isinstance(item, dict) for item in json_obj):
+                    for i, item in enumerate(json_obj):
+                        flatten(item, f"{prefix}_{i}")
+                else:
+                    sections[prefix] = self._clean_text(", ".join(map(str, json_obj)))
             elif isinstance(json_obj, (str, int, float, bool)):
-                 sections[prefix] = self._clean_text(str(json_obj))
+                sections[prefix] = self._clean_text(str(json_obj))
 
         flatten(data)
         logger.info(f"Processed {len(sections)} key-value pairs from JSON data.")
@@ -166,89 +213,169 @@ class ContentExtractor:
         matched_content = {}
         used_keys = set()
 
-        # Iterate through the target keywords defined in config
-        for target_key, keywords in config.SECTION_KEYWORDS.items():
+        # Academic profile specific section mappings
+        academic_mappings = {
+            'biography': ['bio', 'about', 'about me', 'introduction', 'background'],
+            'research': ['research', 'research interests', 'research focus', 'research areas', 'interests'],
+            'publications': ['publications', 'selected publications', 'recent publications', 'papers', 'research papers'],
+            'teaching': ['teaching', 'courses', 'education', 'teaching experience'],
+            'service': ['service', 'professional service', 'academic service', 'committee service'],
+            'awards': ['awards', 'honors', 'achievements', 'grants', 'funding'],
+            'education': ['education', 'academic background', 'degrees', 'phd', 'ph.d.'],
+            'experience': ['experience', 'work experience', 'professional experience', 'positions'],
+            'contact': ['contact', 'contact information', 'email', 'address'],
+            'projects': ['projects', 'research projects', 'current projects', 'ongoing projects']
+        }
+
+        # First pass: exact and close matches
+        for target_key, keywords in academic_mappings.items():
             best_match_score = 0
             best_match_content = ""
             best_match_source_key = None
 
-            # Iterate through the sections extracted from the source (HTML/MD/JSON)
             for source_key, source_content in extracted_sections.items():
                 if not source_content or source_key in used_keys:
                     continue
 
-                # Check fuzzy match score against all keywords for the current target_key
+                # Convert to lowercase for comparison
+                source_key_lower = source_key.lower()
+                
+                # Check for exact matches first
+                if source_key_lower in keywords:
+                    best_match_score = 100
+                    best_match_content = source_content
+                    best_match_source_key = source_key
+                    break
+
+                # Check fuzzy match score against all keywords
                 current_best_score = 0
                 for keyword in keywords:
                     # Use token_set_ratio for flexibility with word order and partial matches
-                    score = fuzz.token_set_ratio(keyword.lower(), source_key.lower())
+                    score = fuzz.token_set_ratio(keyword, source_key_lower)
                     current_best_score = max(current_best_score, score)
 
-                # If this source_key is a better match for the target_key than previous ones
                 if current_best_score > best_match_score:
                     best_match_score = current_best_score
                     best_match_content = source_content
                     best_match_source_key = source_key
 
-            # If a good enough match is found (threshold can be adjusted)
-            MATCH_THRESHOLD = 75 # Adjust as needed
+            # If a good enough match is found
+            MATCH_THRESHOLD = 75
             if best_match_score >= MATCH_THRESHOLD and best_match_source_key:
-                # If this target key already has content, append (optional, might duplicate)
-                # if target_key in matched_content:
-                #    matched_content[target_key] += "\n" + best_match_content
-                # else:
-                #    matched_content[target_key] = best_match_content
-                # Overwrite or take the best match only:
-                if target_key not in matched_content:
-                     matched_content[target_key] = best_match_content
-                     used_keys.add(best_match_source_key) # Mark this source key as used
-                     logger.debug(f"Matched '{best_match_source_key}' to '{target_key}' (Score: {best_match_score})")
-                # else: logger.debug(f"Target key '{target_key}' already filled, skipping '{best_match_source_key}'")
+                matched_content[target_key] = best_match_content
+                used_keys.add(best_match_source_key)
+                logger.debug(f"Matched '{best_match_source_key}' to '{target_key}' (Score: {best_match_score})")
 
+        # Second pass: content-based matching for unmatched sections
+        for source_key, source_content in extracted_sections.items():
+            if source_key in used_keys:
+                continue
 
-        # Add unmatched sections under a generic key? (Optional)
-        # for source_key, source_content in extracted_sections.items():
-        #     if source_key not in used_keys and source_content:
-        #         generic_key = f"unmatched_{source_key}"
-        #         matched_content[generic_key] = source_content
+            # Look for keywords in the content itself
+            content_lower = source_content.lower()
+            for target_key, keywords in academic_mappings.items():
+                if target_key in matched_content:
+                    continue
+
+                for keyword in keywords:
+                    if keyword in content_lower:
+                        matched_content[target_key] = source_content
+                        used_keys.add(source_key)
+                        logger.debug(f"Content-based match: '{source_key}' to '{target_key}'")
+                        break
+
+        # Third pass: handle special cases
+        for source_key, source_content in extracted_sections.items():
+            if source_key in used_keys:
+                continue
+
+            # Handle publications with specific formats
+            if any(venue in source_content for venue in ['ACM', 'IEEE', 'USENIX', 'CCS', 'S&P', 'NDSS']):
+                if 'publications' not in matched_content:
+                    matched_content['publications'] = source_content
+                    used_keys.add(source_key)
+                    logger.debug(f"Venue-based match: '{source_key}' to 'publications'")
+
+            # Handle education with degree indicators
+            elif any(degree in source_content for degree in ['PhD', 'Ph.D.', 'M.S.', 'M.Sc.', 'B.S.', 'B.Sc.']):
+                if 'education' not in matched_content:
+                    matched_content['education'] = source_content
+                    used_keys.add(source_key)
+                    logger.debug(f"Degree-based match: '{source_key}' to 'education'")
+
+        # Add any remaining unmatched sections with generic keys
+        for source_key, source_content in extracted_sections.items():
+            if source_key not in used_keys and source_content.strip():
+                generic_key = f"additional_{source_key.lower().replace(' ', '_')}"
+                matched_content[generic_key] = source_content
+                logger.debug(f"Added unmatched section as '{generic_key}'")
 
         logger.info(f"Mapped extracted content to {len(matched_content)} target sections.")
         return matched_content
 
 
-    def find_sections(self, raw_output: Dict[str, Any], source_tool: str) -> Dict[str, str]:
-        """
-        Identifies semantic sections from raw scraped output.
-        Args:
-            raw_output: Dictionary from the scraping tool (containing 'markdown', 'html', or 'data').
-            source_tool: Name of the tool that produced the output.
-        Returns:
-            Dictionary mapping section keywords (e.g., 'publications') to cleaned text content.
-        """
-        logger.info(f"Extracting sections from {source_tool} output.")
-        extracted_sections = {}
-
-        if 'data' in raw_output and isinstance(raw_output['data'], dict):
-            logger.info("Processing structured JSON data from Firecrawl.")
-            extracted_sections = self._parse_json_data(raw_output['data'])
-        elif 'markdown' in raw_output and raw_output['markdown']:
-            logger.info("Processing Markdown content.")
-            extracted_sections = self._parse_markdown(raw_output['markdown'])
-        elif 'html' in raw_output and raw_output['html']:
-            logger.info("Processing HTML content.")
-            extracted_sections = self._parse_html(raw_output['html'])
-        else:
-            logger.warning(f"No suitable content ('data', 'markdown', or 'html') found in raw output from {source_tool}.")
+    def find_sections(self, raw_content: str, source_tool: str = "browser-use") -> Dict[str, str]:
+        """Extracts sections from raw content based on the source tool."""
+        sections = {}
+        
+        # Handle browser-use output directly
+        if source_tool == "browser-use":
+            try:
+                # Try to parse as JSON first
+                if isinstance(raw_content, dict):
+                    content_dict = raw_content
+                else:
+                    content_dict = json.loads(raw_content)
+                
+                # Process main content
+                if 'markdown' in content_dict:
+                    sections.update(self._parse_markdown(content_dict['markdown']))
+                elif 'html' in content_dict:
+                    sections.update(self._parse_html(content_dict['html']))
+                elif 'data' in content_dict:
+                    sections.update(self._parse_json_data(content_dict['data']))
+                
+                # Process additional content from linked pages
+                if 'additional_content' in content_dict:
+                    for key, content in content_dict['additional_content'].items():
+                        try:
+                            # Try to parse as JSON first
+                            if isinstance(content, dict):
+                                additional_sections = self._parse_json_data(content)
+                            else:
+                                # Try to parse as markdown
+                                additional_sections = self._parse_markdown(content)
+                            
+                            # Merge with existing sections
+                            for section_key, section_content in additional_sections.items():
+                                if section_key in sections:
+                                    # Append content if section already exists
+                                    sections[section_key] += "\n\n" + section_content
+                                else:
+                                    sections[section_key] = section_content
+                            
+                            logger.info(f"Successfully processed additional content from {key}")
+                        except Exception as e:
+                            logger.warning(f"Failed to process additional content from {key}: {e}")
+                
+                return sections
+            except json.JSONDecodeError:
+                # If not JSON, try parsing as markdown
+                return self._parse_markdown(raw_content)
+            except Exception as e:
+                logger.error(f"Error processing browser-use output: {e}")
+                return {}
+        
+        # Handle other tools (Firecrawl, etc.)
+        try:
+            if source_tool == "firecrawl":
+                return self._parse_markdown(raw_content)
+            else:
+                logger.warning(f"Unknown source tool: {source_tool}")
+                return {}
+        except Exception as e:
+            logger.error(f"Error in find_sections: {e}")
             return {}
-
-        if not extracted_sections:
-             logger.warning("Could not extract any potential sections from the raw content.")
-             return {}
-
-        # Match extracted sections to predefined keywords
-        clean_content_dict = self._match_sections(extracted_sections)
-
-        return clean_content_dict
 
 
 # --- Data Structurer ---

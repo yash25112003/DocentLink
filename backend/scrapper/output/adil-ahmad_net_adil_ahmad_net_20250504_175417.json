@@ -1,0 +1,33 @@
+{
+    "metadata": {
+        "source_url": "https://adil-ahmad.net",
+        "timestamp": "2025-05-04T17:54:17.312472",
+        "scraping_tool_used": "browser-use",
+        "schema_version": "v9",
+        "status": "success"
+    },
+    "schema_documentation": "This schema (v9) extends v8 by adding 'personal_info' to consolidate name, title, and affiliation;  'contact_info' nested within 'personal_info' for contact details;  'research' is restructured into 'summary' and 'keywords'; 'education' and 'service' sections are added to accommodate the respective information from the extracted content.  The 'publications' section remains largely the same as v8.",
+    "quality_control": {
+        "completeness_score": 0.8,
+        "missing_required_fields": [
+            "personal_info"
+        ],
+        "potential_duplicates": {},
+        "temporal_annotations": {},
+        "notes": []
+    },
+    "profile_data": {
+        "personal_info": null,
+        "research": {
+            "summary": "Selected Publications: The HitchHiker's Guide to High-Assurance System Observability Protection with Fast Permission Switches by C. Zhang, J. Zeng, Y. Zhang, A. Ahmad, F. Zhang, H. Jin, and Z. Liang (ACM CCS 2024); Veil: A Protected Services Framework for Confidential Virtual Machines by A. Ahmad, B. Ou, C. Liu, X. Zhang, and P. Fonseca (ACM ASPLOS 2023); Rethinking System Audit Architectures for High Event Coverage and Synchronous Log Availability by V. Gandhi, S. Bannerjee, A. Agarwal, A. Ahmad, S. Lee, and M. Peinado (USENIX Security 2023); An Extensible Orchestration and Protection Framework for Confidential Cloud Computing by A. Ahmad, A. Shultz, B. Lee, and P. Fonseca (USENIX OSDI 2023).",
+            "keywords": [
+                "computer security",
+                "systems",
+                "architecture"
+            ]
+        },
+        "publications": "The HitchHiker's Guide to High-Assurance System Observability Protection with Fast Permission Switches by C. Zhang, J. Zeng, Y. Zhang, A. Ahmad, F. Zhang, H. Jin, and Z. Liang (ACM CCS 2024); Veil: A Protected Services Framework for Confidential Virtual Machines by A. Ahmad, B. Ou, C. Liu, X. Zhang, and P. Fonseca (ACM ASPLOS 2023); Rethinking System Audit Architectures for High Event Coverage and Synchronous Log Availability by V. Gandhi, S. Bannerjee, A. Agarwal, A. Ahmad, S. Lee, and M. Peinado (USENIX Security 2023); An Extensible Orchestration and Protection Framework for Confidential Cloud Computing by A. Ahmad, A. Shultz, B. Lee, and P. Fonseca (USENIX OSDI 2023).",
+        "education": "Adil Ahmad is an assistant professor in the School of Computing and Augmented Intelligence (SCAI) at Arizona State University (ASU). His research interests broadly lie within the domains of computer security, systems, and architecture. His research goal is to protect sensitive data from powerful adversaries. To this end, he routinely leverages hardware-assisted trusted execution environments while addressing their fundamental limitations in terms of protection and usability. He also designs new principles to strengthen critical system software (like operating systems and hypervisors) on a computer. He is a recipient of a US DoD Defense Established Program to Stimulate Competitive Research (DEPSCoR) Award. Before joining ASU, he obtained a PhD from Purdue, working with Pedro Fonseca and Byoungyoung Lee. He also interned at Microsoft Research and NEC Labs, working with Sangho Lee, Marcus Peinado, and Chung Hwan Kim. Research interests: ['computer security', 'systems', 'architecture']. Selected Publications: The HitchHiker's Guide to High-Assurance System Observability Protection with Fast Permission Switches by C. Zhang, J. Zeng, Y. Zhang, A. Ahmad, F. Zhang, H. Jin, and Z. Liang (ACM CCS 2024); Veil: A Protected Services Framework for Confidential Virtual Machines by A. Ahmad, B. Ou, C. Liu, X. Zhang, and P. Fonseca (ACM ASPLOS 2023); Rethinking System Audit Architectures for High Event Coverage and Synchronous Log Availability by V. Gandhi, S. Bannerjee, A. Agarwal, A. Ahmad, S. Lee, and M. Peinado (USENIX Security 2023); An Extensible Orchestration and Protection Framework for Confidential Cloud Computing by A. Ahmad, A. Shultz, B. Lee, and P. Fonseca (USENIX OSDI 2023).",
+        "service": "Adil Ahmad is an assistant professor in the School of Computing and Augmented Intelligence (SCAI) at Arizona State University (ASU). His research interests broadly lie within the domains of computer security, systems, and architecture. His research goal is to protect sensitive data from powerful adversaries. To this end, he routinely leverages hardware-assisted trusted execution environments while addressing their fundamental limitations in terms of protection and usability. He also designs new principles to strengthen critical system software (like operating systems and hypervisors) on a computer. He is a recipient of a US DoD Defense Established Program to Stimulate Competitive Research (DEPSCoR) Award. Before joining ASU, he obtained a PhD from Purdue, working with Pedro Fonseca and Byoungyoung Lee. He also interned at Microsoft Research and NEC Labs, working with Sangho Lee, Marcus Peinado, and Chung Hwan Kim. Research interests: ['computer security', 'systems', 'architecture']. Selected Publications: The HitchHiker's Guide to High-Assurance System Observability Protection with Fast Permission Switches by C. Zhang, J. Zeng, Y. Zhang, A. Ahmad, F. Zhang, H. Jin, and Z. Liang (ACM CCS 2024); Veil: A Protected Services Framework for Confidential Virtual Machines by A. Ahmad, B. Ou, C. Liu, X. Zhang, and P. Fonseca (ACM ASPLOS 2023); Rethinking System Audit Architectures for High Event Coverage and Synchronous Log Availability by V. Gandhi, S. Bannerjee, A. Agarwal, A. Ahmad, S. Lee, and M. Peinado (USENIX Security 2023); An Extensible Orchestration and Protection Framework for Confidential Cloud Computing by A. Ahmad, A. Shultz, B. Lee, and P. Fonseca (USENIX OSDI 2023)."
+    }
+}
