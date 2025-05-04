@@ -10,6 +10,7 @@ from thefuzz import fuzz # For fuzzy matching section headers
 
 import config
 from llm_handler import DataExtractor # Import the LLM extractor
+from schema_generator import SchemaGenerator # Import the SchemaGenerator
 
 # Setup logger for this module
 logger = logging.getLogger(__name__)
@@ -21,6 +22,10 @@ llm_data_extractor = DataExtractor()
 
 class ContentExtractor:
     """Extracts and cleans content sections from raw scraped output."""
+
+    def __init__(self):
+        self.data_extractor = DataExtractor()
+        self.schema_generator = SchemaGenerator()
 
     def _clean_text(self, text: str) -> str:
         """Basic text cleaning."""
@@ -235,110 +240,26 @@ class ContentExtractor:
         logger.info(f"Processed {len(sections)} key-value pairs from JSON data.")
         return sections
 
-    def _match_sections(self, extracted_sections: Dict[str, str]) -> Dict[str, str]:
-        """Matches extracted section headers/keys to predefined SECTION_KEYWORDS."""
-        matched_content = {}
-        used_keys = set()
+    def _structure_content(self, sections: Dict[str, str]) -> Dict[str, Any]:
+        """Structures the extracted sections using LLM."""
+        # Get or generate schema
+        schema, schema_version, schema_doc = self.schema_generator.analyze_and_generate_schema(sections)
+        if not schema:
+            logger.error("Failed to get schema for content structuring")
+            return {}
 
-        # Academic profile specific section mappings
-        academic_mappings = {
-            'biography': ['bio', 'about', 'about me', 'introduction', 'background', 'profile'],
-            'research': ['research', 'research interests', 'research focus', 'research areas', 'interests', 'scholarly interests'],
-            'publications': ['publications', 'selected publications', 'recent publications', 'papers', 'research papers', 'journal articles', 'conference proceedings'],
-            'teaching': ['teaching', 'courses', 'education', 'teaching experience', 'courses taught'],
-            'service': ['service', 'professional service', 'academic service', 'committee service'],
-            'awards': ['awards', 'honors', 'achievements', 'grants', 'funding', 'prizes'],
-            'education': ['education', 'academic background', 'degrees', 'phd', 'ph.d.', 'm.s.', 'b.s.'],
-            'experience': ['experience', 'work experience', 'professional experience', 'positions'],
-            'contact': ['contact', 'contact information', 'email', 'address', 'office'],
-            'projects': ['projects', 'research projects', 'current projects', 'ongoing projects', 'funded projects']
-        }
+        # Structure the content using the schema
+        structured_data = {}
+        for field, field_schema in schema.items():
+            # Combine all sections for context
+            context = "\n\n".join([f"{k}:\n{v}" for k, v in sections.items()])
+            
+            # Extract structured data for this field
+            field_data = self.data_extractor.extract_structured_data(context, {field: field_schema})
+            if field_data:
+                structured_data.update(field_data)
 
-        # First pass: exact and close matches
-        for target_key, keywords in academic_mappings.items():
-            best_match_score = 0
-            best_match_content = ""
-            best_match_source_key = None
-
-            for source_key, source_content in extracted_sections.items():
-                if not source_content or source_key in used_keys:
-                    continue
-
-                # Convert to lowercase for comparison
-                source_key_lower = source_key.lower()
-                
-                # Check for exact matches first
-                if source_key_lower in keywords:
-                    best_match_score = 100
-                    best_match_content = source_content
-                    best_match_source_key = source_key
-                    break
-
-                # Check fuzzy match score against all keywords
-                current_best_score = 0
-                for keyword in keywords:
-                    # Use token_set_ratio for flexibility with word order and partial matches
-                    score = fuzz.token_set_ratio(keyword, source_key_lower)
-                    current_best_score = max(current_best_score, score)
-
-                if current_best_score > best_match_score:
-                    best_match_score = current_best_score
-                    best_match_content = source_content
-                    best_match_source_key = source_key
-
-            # If a good enough match is found
-            MATCH_THRESHOLD = 75
-            if best_match_score >= MATCH_THRESHOLD and best_match_source_key:
-                matched_content[target_key] = best_match_content
-                used_keys.add(best_match_source_key)
-                logger.debug(f"Matched '{best_match_source_key}' to '{target_key}' (Score: {best_match_score})")
-
-        # Second pass: content-based matching for unmatched sections
-        for source_key, source_content in extracted_sections.items():
-            if source_key in used_keys:
-                continue
-
-            # Look for keywords in the content itself
-            content_lower = source_content.lower()
-            for target_key, keywords in academic_mappings.items():
-                if target_key in matched_content:
-                    continue
-
-                for keyword in keywords:
-                    if keyword in content_lower:
-                        matched_content[target_key] = source_content
-                        used_keys.add(source_key)
-                        logger.debug(f"Content-based match: '{source_key}' to '{target_key}'")
-                        break
-
-        # Third pass: handle special cases
-        for source_key, source_content in extracted_sections.items():
-            if source_key in used_keys:
-                continue
-
-            # Handle publications with specific formats
-            if any(venue in source_content for venue in ['ACM', 'IEEE', 'USENIX', 'CCS', 'S&P', 'NDSS', 'arXiv']):
-                if 'publications' not in matched_content:
-                    matched_content['publications'] = source_content
-                    used_keys.add(source_key)
-                    logger.debug(f"Venue-based match: '{source_key}' to 'publications'")
-
-            # Handle education with degree indicators
-            elif any(degree in source_content for degree in ['PhD', 'Ph.D.', 'M.S.', 'M.Sc.', 'B.S.', 'B.Sc.', 'Bachelor', 'Master', 'Doctorate']):
-                if 'education' not in matched_content:
-                    matched_content['education'] = source_content
-                    used_keys.add(source_key)
-                    logger.debug(f"Degree-based match: '{source_key}' to 'education'")
-
-        # Add any remaining unmatched sections with generic keys
-        for source_key, source_content in extracted_sections.items():
-            if source_key not in used_keys and source_content.strip():
-                generic_key = f"additional_{source_key.lower().replace(' ', '_')}"
-                matched_content[generic_key] = source_content
-                logger.debug(f"Added unmatched section as '{generic_key}'")
-
-        logger.info(f"Mapped extracted content to {len(matched_content)} target sections.")
-        return matched_content
+        return structured_data
 
     def find_sections(self, raw_content: str, source_tool: str = "browser-use") -> Dict[str, str]:
         """Extracts sections from raw content based on the source tool."""
@@ -384,10 +305,20 @@ class ContentExtractor:
                         except Exception as e:
                             logger.warning(f"Failed to process additional content from {key}: {e}")
                 
+                # Structure the content using LLM
+                structured_sections = self._structure_content(sections)
+                if structured_sections:
+                    sections = structured_sections
+                
                 return sections
             except json.JSONDecodeError:
                 # If not JSON, try parsing as markdown
-                return self._parse_markdown(raw_content)
+                sections = self._parse_markdown(raw_content)
+                # Structure the content using LLM
+                structured_sections = self._structure_content(sections)
+                if structured_sections:
+                    sections = structured_sections
+                return sections
             except Exception as e:
                 logger.error(f"Error processing browser-use output: {e}")
                 return {}
@@ -395,7 +326,12 @@ class ContentExtractor:
         # Handle other tools (Firecrawl, etc.)
         try:
             if source_tool == "firecrawl":
-                return self._parse_markdown(raw_content)
+                sections = self._parse_markdown(raw_content)
+                # Structure the content using LLM
+                structured_sections = self._structure_content(sections)
+                if structured_sections:
+                    sections = structured_sections
+                return sections
             else:
                 logger.warning(f"Unknown source tool: {source_tool}")
                 return {}

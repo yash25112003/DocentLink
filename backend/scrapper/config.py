@@ -83,7 +83,8 @@ BROWSER_USE_CONFIG = {
     'extraction_strategy': 'markdown', # Preferred output: 'markdown', 'html', or 'structured'
     'timeout': 180, # seconds
     'use_proxy': bool(BRIGHTDATA_WSS_URL),
-    'proxy_url': BRIGHTDATA_WSS_URL
+    'proxy_url': BRIGHTDATA_WSS_URL,
+    'disable_gif_creation': True
 }
 
 # Playwright Configuration

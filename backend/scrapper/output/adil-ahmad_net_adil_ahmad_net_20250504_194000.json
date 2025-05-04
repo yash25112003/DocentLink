@@ -1,0 +1,196 @@
+{
+    "metadata": {
+        "source_url": "https://adil-ahmad.net",
+        "timestamp": "2025-05-04T19:40:00.866029",
+        "scraping_tool_used": "browser-use",
+        "schema_version": "v19",
+        "status": "success"
+    },
+    "schema_documentation": "This schema (v19) extends v18 by adding more detailed structures for the 'research' section, separating markdown and HTML in the biography, adding a date field to recent updates, and improving the publications section to include author lists and publication types.  The 'research' section now includes nested objects for projects and awards, allowing for richer representation of research activities.  The 'recent_updates' section now includes a date field for better organization. The 'publications' section now includes an array of authors and a type field to distinguish between conference papers, journal articles, and books.  All fields use snake_case naming convention for clarity.",
+    "quality_control": {
+        "completeness_score": 0.78,
+        "missing_required_fields": [
+            "personal_info"
+        ],
+        "potential_duplicates": {},
+        "academic_content_quality": {
+            "missing_sections": [
+                "education"
+            ],
+            "incomplete_sections": [],
+            "format_issues": [],
+            "suggestions": []
+        },
+        "notes": [
+            "Missing important academic sections: education"
+        ]
+    },
+    "profile_data": {
+        "title": "Academic Profile",
+        "description": "Schema for representing an academic profile.",
+        "personal_info": null,
+        "biography": {
+            "markdown": "# Adil Ahmad\n\nI am an assistant professor in the [School of Computing and Augmented Intelligence (SCAI)](https://scai.engineering.asu.edu/) at Arizona State University (ASU). My research interests broadly lie within the domains of computer security, systems, and architecture. My research goal is to protect sensitive data from powerful adversaries. To this end, I routinely leverage hardware-assisted trusted execution environments while addressing their fundamental limitations in terms of protection and usability. I also design new principles to strengthen critical system software (like operating systems and hypervisors) on a computer. I am a receipient of a US DoD [Defense Established Program to Stimulate Competitive Research (DEPSCoR) Award](https://www.defense.gov/News/Releases/Release/Article/3711356/dod-announces-defense-established-program-to-stimulate-competitive-research-awa/).\n\nBefore joining ASU, I spent many enjoyable years obtaining a PhD from Purdue (go boilermakers!), where I was extremely fortunate to work with [Pedro Fonseca](https://www.cs.purdue.edu/homes/pfonseca/) and [Byoungyoung Lee](https://lifeasageek.github.io/). During my PhD, I greatly enjoyed interning at Microsoft Research and NEC Labs, where I worked with [Sangho Lee](https://sangho2.github.io/), [Marcus Peinado](https://www.microsoft.com/en-us/research/people/marcuspe/), and [Chung Hwan Kim](https://chungkim.gitlab.io/).\n\n❗ I am looking to hire PhD students for exciting systems and security research projects. If you are interested in working in this area, please reach out through email.\n---\n⚠️ I do not hire students as graders or TAs for a class, if they have not previously taken the class.\n---\n\n## Recent Updates\n\n * Gave a talk at Seoul National University (SNU) on our recent research endeavours towards designing a secure logging infrastructure for mission-critical computers.\n\n * [Laputa](https://adil-ahmad.net/xxx)was accepted to appear at ISOC NDSS 2025!\n * [Pooyan Fazli](https://pooyanfazli.com/),[Hasti Seifi](https://hastiseifi.com/), and I have received a 2024 Google ExploreCSR award to expand our outreach activities (including the Desert CodeSprouts Workshop). Thanks Google!\n * Chairing SCAI's effort to hire faculty in the broad area of Operating Systems, Compilers, and Programming Languages. Please find the job posting [here](https://apply.interfolio.com/157464).\n\n * [HitchHiker](https://adil-ahmad.net/papers/zhang-hitchhiker.pdf)was accepted to appear at ACM CCS 2024! Congratulations to Chuqi and all my collaborators. You can find the research artifact on[GitHub](https://github.com/ASTERISC-Release/HitchHiker).\n * Intel has donated data center equipment to our research lab to help pursue secure enclave-related research. Thanks Intel!\n\n * Invited to serve in the program committees of [USENIX OSDI 2025](https://www.usenix.org/conference/osdi25)and[USENIX Security 2025](https://www.usenix.org/conference/usenixsecurity25). Please submit your best systems and security work!\n\n * Read all about the Desert CodeSprouts Workshop in this [news article](https://scai.engineering.asu.edu/news/training-the-techies-of-tomorrow/).\n\n * Organized the [1st Desert CodeSprouts Workshop for Middle-School Students](https://scai.engineering.asu.edu/desert-codesprouts-workshop/)in the Greater Phoenix area. Thank you to all the participants, coordinators, volunteers, and especially the workshop co-founder (Prof. Hasti Seifi). Special thanks to the School of Computing and Augmented Intelligence (SCAI) and[the American Cybersecurity Education](http://ace-institute.asu.edu/)(ACE) Institute for co-sponsoring this event. Please stay tuned for future workshop events at our[website](https://scai.engineering.asu.edu/desert-codesprouts-workshop/)!\n\n * Invited to serve in the program committees of [IEEE S&P 2025](https://sp2025.ieee-security.org/),[ACM EuroSys 2025](https://2025.eurosys.org/), and[IEEE HPCA 2025](https://hpca-conf.org/2025/). Please submit your best (security, systems, and architecture) work!\n\n * Presented Veil at ACM ASPLOS 2024 in San Diego. Thank you all for the amazing reception!\n\n * Greatly honored to receive the [2024 US Department of Defense's Defense Established Program to Stimulate Competitive Research (DEPSCoR) Award](https://www.defense.gov/News/Releases/Release/Article/3711356/dod-announces-defense-established-program-to-stimulate-competitive-research-awa/)! Our work will strive to overhaul the state of today's computer logging infrastructure for mission-critical computers. Thank you for the support!\n\n * Teaching the Operating Systems course at SCAI in Fall 2024. Please refer to the [link](https://adil-ahmad.net/teaching/index.html)for details.\n\n * Invited to serve in the program committees of [USENIX Security 2024](https://www.usenix.org/conference/usenixsecurity24),[ISOC NDSS 2024 Poster Session](https://www.ndss-symposium.org/ndss2024/), and[ISOC Workshop on Artificial Intelligence System with Confidential Computing (AISCC) 2024](https://www.ndss-symposium.org/ndss2024/co-located-events/aiscc/). Please submit your best work!\n\n * Presented eOPF at USENIX OSDI 2023 in Boston. Thank you all for the amazing questions and discussion!\n\n * [Veil](https://adil-ahmad.net/papers/ahmad-veil.pdf)was accepted to appear at ACM ASPLOS 2024! Stay tuned for the paper PDF and artifact.\n * [OmniLog](https://adil-ahmad.net/papers/gandhi-omnilog.pdf)was accepted to appear at USENIX Security 2023! This work calls for a rethink of audit system designs in modern computers to address (a) the limited collection of system logs relevant to forensic analysis of kernel exploits and (b) the tampering of collected logs. Congratulations to Aniket and all my collaborators.\n * [eOPF](../papers/ahmad-eopf.pdf)was accepted to appear at USENIX OSDI 2023! In this work, we design a trustworthy and extensible software layer to complement the hardware capabilities of a widely-used confidential computing technology (Intel SGX) with strong cloud orchestration and side-channel defense features.\n * Rebooting the Advanced Operating Systems course at SCAI in Spring 2023. Please refer to the [link](https://adil-ahmad.net/teaching/index.html)for details.\n\n * Prof. [Hasti Seifi](https://hastiseifi.com/)and I are co-designing the first ASU SCAI Outreach Workshop in 2023/2024! Please stay tuned for further information and website details.\n\n * Teaching a course titled ",
+            "html": null
+        },
+        "recent_updates": null,
+        "research": {
+            "summary": "My research interests broadly lie within the domains of computer security, systems, and architecture. My research goal is to protect sensitive data from powerful adversaries. To this end, I routinely leverage hardware-assisted trusted execution environments while addressing their fundamental limitations in terms of protection and usability. I also design new principles to strengthen critical system software (like operating systems and hypervisors) on a computer.",
+            "interests": [
+                "computer security",
+                "systems",
+                "architecture"
+            ],
+            "projects": [
+                {
+                    "title": "Laputa",
+                    "description": "Accepted to appear at ISOC NDSS 2025!",
+                    "publications": []
+                },
+                {
+                    "title": "HitchHiker",
+                    "description": "Accepted to appear at ACM CCS 2024!",
+                    "publications": []
+                },
+                {
+                    "title": "Veil",
+                    "description": "Presented at ACM ASPLOS 2024 in San Diego.",
+                    "publications": []
+                },
+                {
+                    "title": "OmniLog",
+                    "description": "Accepted to appear at USENIX Security 2023! This work calls for a rethink of audit system designs in modern computers to address (a) the limited collection of system logs relevant to forensic analysis of kernel exploits and (b) the tampering of collected logs.",
+                    "publications": []
+                },
+                {
+                    "title": "eOPF",
+                    "description": "Accepted to appear at USENIX OSDI 2023! In this work, we design a trustworthy and extensible software layer to complement the hardware capabilities of a widely-used confidential computing technology (Intel SGX) with strong cloud orchestration and side-channel defense features.",
+                    "publications": []
+                }
+            ],
+            "awards": [
+                {
+                    "name": "Defense Established Program to Stimulate Competitive Research (DEPSCoR) Award",
+                    "description": "US DoD Award",
+                    "url": "https://www.defense.gov/News/Releases/Release/Article/3711356/dod-announces-defense-established-program-to-stimulate-competitive-research-awa/"
+                },
+                {
+                    "name": "2024 Google ExploreCSR award",
+                    "description": "To expand our outreach activities (including the Desert CodeSprouts Workshop)",
+                    "url": null
+                }
+            ],
+            "funding": []
+        },
+        "teaching": [
+            {
+                "courseName": "Operating Systems",
+                "semester": "Fall",
+                "year": 2024,
+                "details": "Please refer to the [link](https://adil-ahmad.net/teaching/index.html)for details."
+            },
+            {
+                "courseName": "Advanced Operating Systems",
+                "semester": "Spring",
+                "year": 2023,
+                "details": "Please refer to the [link](https://adil-ahmad.net/teaching/index.html)for details."
+            }
+        ],
+        "publications": [
+            {
+                "title": "Laputa",
+                "authors": [
+                    "Adil Ahmad"
+                ],
+                "venue": "ISOC NDSS",
+                "year": 2025,
+                "url": "https://adil-ahmad.net/xxx",
+                "type": "conference"
+            },
+            {
+                "title": "HitchHiker",
+                "authors": [
+                    "Chuqi",
+                    "Adil Ahmad"
+                ],
+                "venue": "ACM CCS",
+                "year": 2024,
+                "url": "https://adil-ahmad.net/papers/zhang-hitchhiker.pdf",
+                "type": "conference"
+            },
+            {
+                "title": "Veil",
+                "authors": [
+                    "Adil Ahmad"
+                ],
+                "venue": "ACM ASPLOS",
+                "year": 2024,
+                "url": "https://adil-ahmad.net/papers/ahmad-veil.pdf",
+                "type": "conference"
+            },
+            {
+                "title": "OmniLog",
+                "authors": [
+                    "Aniket",
+                    "Adil Ahmad"
+                ],
+                "venue": "USENIX Security",
+                "year": 2023,
+                "url": "https://adil-ahmad.net/papers/gandhi-omnilog.pdf",
+                "type": "conference"
+            },
+            {
+                "title": "eOPF",
+                "authors": [
+                    "Adil Ahmad"
+                ],
+                "venue": "USENIX OSDI",
+                "year": 2023,
+                "url": "../papers/ahmad-eopf.pdf",
+                "type": "conference"
+            }
+        ],
+        "service": [
+            {
+                "role": "Program Committee Member",
+                "organization": "USENIX OSDI 2025",
+                "year": 2025
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "USENIX Security 2025",
+                "year": 2025
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "IEEE S&P 2025",
+                "year": 2025
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "ACM EuroSys 2025",
+                "year": 2025
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "IEEE HPCA 2025",
+                "year": 2025
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "USENIX Security 2024",
+                "year": 2024
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "ISOC NDSS 2024 Poster Session",
+                "year": 2024
+            },
+            {
+                "role": "Program Committee Member",
+                "organization": "ISOC Workshop on Artificial Intelligence System with Confidential Computing (AISCC) 2024",
+                "year": 2024
+            }
+        ]
+    }
+}

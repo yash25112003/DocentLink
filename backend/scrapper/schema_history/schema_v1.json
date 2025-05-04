@@ -1,60 +1,214 @@
 {
-    "version": "v1",
-    "schema": {
-        "personal_background": {
-            "type": "string"
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Academic Profile",
+  "description": "Schema for representing an academic profile.",
+  "type": "object",
+  "properties": {
+    "biography": {
+      "type": "object",
+      "properties": {
+        "markdown": {
+          "type": "string",
+          "description": "Biography in Markdown format."
         },
-        "affiliations": {
-            "type": "list",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "institution": {
-                        "type": "string"
-                    },
-                    "department": {
-                        "type": "string"
-                    },
-                    "title": {
-                        "type": "string"
-                    },
-                    "lab": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "institution",
-                    "title"
-                ]
-            }
-        },
-        "education": {
-            "type": "list",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "degree": {
-                        "type": "string"
-                    },
-                    "university": {
-                        "type": "string"
-                    },
-                    "country": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "degree",
-                    "university"
-                ]
-            }
-        },
-        "research_interests": {
-            "type": "list",
-            "items": {
-                "type": "string"
-            }
+        "html": {
+          "type": "string",
+          "description": "Biography in HTML format (optional)."
         }
+      },
+      "required": [
+        "markdown"
+      ]
     },
-    "documentation": "This schema defines the structure for an academic profile.  \n\n* `personal_background`: A free-text string describing the individual's background. \n* `affiliations`: A list of objects, each representing an affiliation. Each affiliation object includes the `institution`, `department`, `title`, and `lab` (optional). \n* `education`: A list of objects, each representing an educational degree. Each education object includes the `degree`, `university`, and `country`. \n* `research_interests`: A list of strings, each representing a research interest."
+    "research": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Summary of research interests."
+        },
+        "interests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of research interests."
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publications": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/publication"
+                }
+              }
+            },
+            "required": [
+              "title"
+            ]
+          }
+        },
+        "awards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "url"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "funding": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agency": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "year": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "agency",
+              "title"
+            ]
+          }
+        }
+      },
+      "required": [
+        "summary"
+      ]
+    },
+    "publications": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/publication"
+      }
+    },
+    "teaching": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "courseName": {
+            "type": "string"
+          },
+          "semester": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "courseName"
+        ]
+      }
+    },
+    "service": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "role",
+          "organization"
+        ]
+      }
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "required": [
+        "email"
+      ]
+    }
+  },
+  "definitions": {
+    "publication": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "venue": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string",
+          "format": "url"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "journal",
+            "conference",
+            "book",
+            "other"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "authors",
+        "venue",
+        "year"
+      ]
+    }
+  }
 }

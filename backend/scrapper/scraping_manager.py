@@ -48,19 +48,38 @@ gemini_model = ChatGoogleGenerativeAI(
 class ContentValidator:
     """Validates the adequacy of scraped content."""
     @staticmethod
-    def is_content_adequate(clean_content_dict: Dict[str, str]) -> Tuple[bool, List[str]]:
+    def is_content_adequate(clean_content_dict: Dict[str, Any]) -> Tuple[bool, List[str]]:
         if not clean_content_dict:
             logger.warning("Content validation failed: No sections extracted.")
             return False, config.REQUIRED_SECTIONS
 
-        missing_required = [
-            section for section in config.REQUIRED_SECTIONS
-            if section not in clean_content_dict or not clean_content_dict[section].strip()
-        ]
+        missing_required = []
+        for section in config.REQUIRED_SECTIONS:
+            if section not in clean_content_dict:
+                missing_required.append(section)
+            else:
+                content = clean_content_dict[section]
+                if isinstance(content, str):
+                    if not content.strip():
+                        missing_required.append(section)
+                elif isinstance(content, list):
+                    if not content:
+                        missing_required.append(section)
+                elif content is None:
+                    missing_required.append(section)
+
         if missing_required:
             logger.warning(f"Content validation warning: Missing required sections: {missing_required}. Checking total length...")
 
-        total_length = sum(len(content) for content in clean_content_dict.values())
+        total_length = 0
+        for content in clean_content_dict.values():
+            if isinstance(content, str):
+                total_length += len(content)
+            elif isinstance(content, list):
+                total_length += sum(len(str(item)) for item in content)
+            elif content is not None:
+                total_length += len(str(content))
+
         if total_length < config.MIN_CONTENT_LENGTH:
             logger.error(f"Content validation failed: Total content length ({total_length}) is less than minimum ({config.MIN_CONTENT_LENGTH}).")
             return False, missing_required
@@ -68,7 +87,7 @@ class ContentValidator:
         if not missing_required:
             logger.info(f"Content validation passed (Length: {total_length}). All required sections found.")
         else:
-             logger.info(f"Content validation passed (Length: {total_length}, but required sections {missing_required} were missing/empty).")
+            logger.info(f"Content validation passed (Length: {total_length}, but required sections {missing_required} were missing/empty).")
         return True, missing_required
 
 # --- Scraping Managers ---
