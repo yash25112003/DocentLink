@@ -1,0 +1,170 @@
+{
+    "version": "v13",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "affiliation": {
+                    "type": "string"
+                },
+                "contact_info": {
+                    "type": "object",
+                    "properties": {
+                        "email": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "office": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "full_name",
+                "title",
+                "affiliation"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "code_url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "authors",
+                    "venue",
+                    "year"
+                ]
+            }
+        },
+        "service": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "organization": {
+                        "type": "string"
+                    },
+                    "years": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "details": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title",
+                    "organization",
+                    "years",
+                    "role"
+                ]
+            }
+        },
+        "biography_items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "biography",
+                            "research",
+                            "teaching",
+                            "education"
+                        ]
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string"
+                                },
+                                "venue": {
+                                    "type": "string"
+                                },
+                                "date": {
+                                    "type": "string",
+                                    "format": "date"
+                                }
+                            },
+                            "required": [
+                                "title",
+                                "venue"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "description",
+                    "category"
+                ]
+            }
+        },
+        "contact": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "address": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "documentation": "This schema (v13) extends v12 by adding a 'years' field (array of integers) to the 'service' items to handle multiple years of service.  The 'biography_items' section now includes an 'events' field (array of objects), allowing for structured representation of events like talks and presentations. Each event object has a 'title', 'venue', and optional 'date' field.  The 'contact' section remains largely unchanged. The 'publications' section remains the same as in v12."
+}

@@ -1,0 +1,189 @@
+{
+    "version": "v14",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "affiliation": {
+                    "type": "string"
+                },
+                "contact_info": {
+                    "type": "object",
+                    "properties": {
+                        "email": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "office": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "full_name",
+                "title",
+                "affiliation"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            },
+            "required": [
+                "text"
+            ]
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "publications": {
+            "type": "object",
+            "properties": {
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "service": {
+            "type": "object",
+            "properties": {
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "education": {
+            "type": "object",
+            "properties": {
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "contact": {
+            "type": "object",
+            "properties": {
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "additional_notes": {
+            "type": "string"
+        }
+    },
+    "documentation": "This schema (v14) introduces significant changes to accommodate the distinct sections (biography, research, publications, teaching, service, education, contact) present in the extracted content.  Each section now has its own object with a 'recent_updates' array.  Each item in 'recent_updates' is an object with a 'description' (string) and an optional 'url' (string, format: url).  The 'personal_info' section remains largely the same as in v13. An 'additional_notes' field is added to capture miscellaneous information.  This structure provides a more accurate and flexible representation of the data compared to the previous version."
+}

@@ -1,0 +1,181 @@
+{
+    "version": "v15",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "affiliation": {
+                    "type": "string"
+                },
+                "contact_info": {
+                    "type": "object",
+                    "properties": {
+                        "email": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "office": {
+                            "type": "string"
+                        },
+                        "website": {
+                            "type": "string",
+                            "format": "url"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "full_name",
+                "title",
+                "affiliation"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                }
+            }
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "journal_or_conference": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "doi": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "teaching": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "course_name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "level": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "service": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "organization": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "major": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "awards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "awarding_body": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "additional_notes": {
+            "type": "string"
+        }
+    },
+    "documentation": "This schema (v15) provides a more detailed structure for academic profiles.  The 'recent_updates' array has been replaced with more specific arrays for each section (research, publications, teaching, service, education, awards).  Each item in these arrays is an object with properties relevant to that section.  For example, the 'publications' array contains objects with fields for title, authors, journal/conference, year, URL, and DOI.  The 'research' array allows for multiple research projects with titles, descriptions, keywords, and URLs. The 'education' array contains details about degrees earned. The 'awards' array contains details about any awards received.  The 'personal_info' section remains largely unchanged but adds a website field to the contact information.  The 'additional_notes' field remains a free-form string for miscellaneous information."
+}

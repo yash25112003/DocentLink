@@ -37,44 +37,48 @@ class ContentExtractor:
         current_section = None
         current_content = []
         
-        # Split the markdown into lines
-        lines = markdown_text.split('\n')
+        # First, try to extract sections based on common academic profile patterns
+        patterns = {
+            'biography': r'(?i)(?:bio|biography|about me|about|background|profile)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'research': r'(?i)(?:research interests|research focus|research areas|research|scholarly interests)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'publications': r'(?i)(?:publications|selected publications|recent publications|papers|journal articles|conference proceedings)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'teaching': r'(?i)(?:teaching|courses|education|teaching experience|courses taught)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'service': r'(?i)(?:service|professional service|academic service|committee service)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'awards': r'(?i)(?:awards|honors|achievements|grants|funding|prizes)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'education': r'(?i)(?:education|academic background|degrees|phd|ph\.d\.|m\.s\.|b\.s\.)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'projects': r'(?i)(?:projects|research projects|current projects|ongoing projects|funded projects)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
+            'contact': r'(?i)(?:contact|contact information|email|address|office)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)'
+        }
         
-        for line in lines:
-            # Check for headings (both ATX and Setext styles)
-            if line.startswith('#') or (len(line) > 0 and all(c == '=' for c in line.strip()) or all(c == '-' for c in line.strip())):
-                # If we have a current section, save it
-                if current_section and current_content:
-                    sections[current_section] = '\n'.join(current_content).strip()
-                
-                # Start new section
-                current_section = line.strip('#=- ').lower()
-                current_content = []
-            else:
-                # Add line to current section if we have one
-                if current_section:
-                    current_content.append(line)
+        # Try pattern matching first
+        for section, pattern in patterns.items():
+            match = re.search(pattern, markdown_text, re.DOTALL)
+            if match:
+                sections[section] = match.group(1).strip()
         
-        # Save the last section
-        if current_section and current_content:
-            sections[current_section] = '\n'.join(current_content).strip()
-        
-        # If no sections were found, try to extract content based on common academic profile patterns
+        # If no sections found with patterns, try heading-based parsing
         if not sections:
-            # Look for common academic profile sections
-            patterns = {
-                'biography': r'(?i)(?:bio|biography|about me|about)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
-                'research': r'(?i)(?:research interests|research focus|research areas)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
-                'publications': r'(?i)(?:publications|selected publications|recent publications)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
-                'teaching': r'(?i)(?:teaching|courses|education)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
-                'service': r'(?i)(?:service|professional service|academic service)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)',
-                'awards': r'(?i)(?:awards|honors|achievements)(?:\s*:|\s*$)(.*?)(?=\n\n|\Z)'
-            }
+            # Split the markdown into lines
+            lines = markdown_text.split('\n')
             
-            for section, pattern in patterns.items():
-                match = re.search(pattern, markdown_text, re.DOTALL)
-                if match:
-                    sections[section] = match.group(1).strip()
+            for line in lines:
+                # Check for headings (both ATX and Setext styles)
+                if line.startswith('#') or (len(line) > 0 and all(c == '=' for c in line.strip()) or all(c == '-' for c in line.strip())):
+                    # If we have a current section, save it
+                    if current_section and current_content:
+                        sections[current_section] = '\n'.join(current_content).strip()
+                    
+                    # Start new section
+                    current_section = line.strip('#=- ').lower()
+                    current_content = []
+                else:
+                    # Add line to current section if we have one
+                    if current_section:
+                        current_content.append(line)
+            
+            # Save the last section
+            if current_section and current_content:
+                sections[current_section] = '\n'.join(current_content).strip()
         
         # If still no sections, try to extract content between major headings
         if not sections:
@@ -90,11 +94,37 @@ class ContentExtractor:
                         section_name = first_line.lower().replace(' ', '_')
                         sections[section_name] = part.strip()
         
+        # If still no sections, try to extract based on common academic content structure
+        if not sections:
+            # Extract biography from the first paragraph
+            bio_match = re.search(r'^(.*?)(?=\n\n|\Z)', markdown_text, re.DOTALL)
+            if bio_match:
+                sections['biography'] = bio_match.group(1).strip()
+            
+            # Extract research interests
+            research_match = re.search(r'(?i)research interests.*?(?=\n\n|\Z)', markdown_text, re.DOTALL)
+            if research_match:
+                sections['research'] = research_match.group(0).strip()
+            
+            # Extract publications
+            pub_match = re.search(r'(?i)publications.*?(?=\n\n|\Z)', markdown_text, re.DOTALL)
+            if pub_match:
+                sections['publications'] = pub_match.group(0).strip()
+            
+            # Extract teaching
+            teaching_match = re.search(r'(?i)teaching.*?(?=\n\n|\Z)', markdown_text, re.DOTALL)
+            if teaching_match:
+                sections['teaching'] = teaching_match.group(0).strip()
+        
         # Clean up the sections
         cleaned_sections = {}
         for section, content in sections.items():
             if content.strip():
                 cleaned_sections[section] = self._clean_text(content)
+        
+        # If we still have no sections, use the entire content as a single section
+        if not cleaned_sections:
+            cleaned_sections['content'] = self._clean_text(markdown_text)
         
         logger.info(f"Extracted {len(cleaned_sections)} sections from markdown.")
         return cleaned_sections
@@ -117,53 +147,51 @@ class ContentExtractor:
 
             # Process headers first
             for header in headers:
-                 header_text = self._clean_text(header.get_text())
-                 if not header_text or header in processed_elements:
-                      continue
+                header_text = self._clean_text(header.get_text())
+                if not header_text or header in processed_elements:
+                    continue
 
-                 content = []
-                 # Find siblings until the next header or a limiting tag
-                 for sibling in header.find_next_siblings():
-                      if sibling.name.startswith('h') or sibling.name in ['section', 'footer', 'nav']: # Stop at next header or major section break
-                           break
-                      if sibling not in processed_elements:
-                           # Check if sibling is a container with relevant info
-                           if isinstance(sibling, Tag):
-                                # Avoid adding empty containers or script tags
-                                if sibling.name == 'script' or not sibling.get_text(strip=True):
-                                     continue
-                                content.append(sibling.get_text(separator=' ', strip=True))
-                                processed_elements.add(sibling) # Mark as processed
-                           elif isinstance(sibling, NavigableString) and sibling.strip():
-                                content.append(sibling.strip())
-                                # Cannot add NavigableString to set, but its content is captured
+                content = []
+                # Find siblings until the next header or a limiting tag
+                for sibling in header.find_next_siblings():
+                    if sibling.name.startswith('h') or sibling.name in ['section', 'footer', 'nav']: # Stop at next header or major section break
+                        break
+                    if sibling not in processed_elements:
+                        # Check if sibling is a container with relevant info
+                        if isinstance(sibling, Tag):
+                            # Avoid adding empty containers or script tags
+                            if sibling.name == 'script' or not sibling.get_text(strip=True):
+                                continue
+                            content.append(sibling.get_text(separator=' ', strip=True))
+                            processed_elements.add(sibling) # Mark as processed
+                        elif isinstance(sibling, NavigableString) and sibling.strip():
+                            content.append(sibling.strip())
+                            # Cannot add NavigableString to set, but its content is captured
 
-                 if header_text and content:
-                      sections[header_text] = self._clean_text(" ".join(content))
-                      processed_elements.add(header)
-
+                if header_text and content:
+                    sections[header_text] = self._clean_text(" ".join(content))
+                    processed_elements.add(header)
 
             # Add content from specifically identified sections (Strategy 1) if not already captured
             for section_tag in potential_sections:
-                 if section_tag in processed_elements:
-                      continue
-                 # Try to find a representative header within the section or use ID/class
-                 section_header_tag = section_tag.find(['h2', 'h3', 'h4'])
-                 section_key = self._clean_text(section_header_tag.get_text()) if section_header_tag else section_tag.get('id') or (section_tag.get('class') and section_tag.get('class')[0])
-                 section_key = section_key or f"section_{len(sections)}" # Fallback key
+                if section_tag in processed_elements:
+                    continue
+                # Try to find a representative header within the section or use ID/class
+                section_header_tag = section_tag.find(['h2', 'h3', 'h4'])
+                section_key = self._clean_text(section_header_tag.get_text()) if section_header_tag else section_tag.get('id') or (section_tag.get('class') and section_tag.get('class')[0])
+                section_key = section_key or f"section_{len(sections)}" # Fallback key
 
-                 section_content = self._clean_text(section_tag.get_text(separator=' ', strip=True))
+                section_content = self._clean_text(section_tag.get_text(separator=' ', strip=True))
 
-                 if section_key and section_content and section_key not in sections:
-                      sections[section_key] = section_content
-                      processed_elements.add(section_tag) # Add container to processed
-
+                if section_key and section_content and section_key not in sections:
+                    sections[section_key] = section_content
+                    processed_elements.add(section_tag) # Add container to processed
 
             # Basic cleanup if no sections found (e.g., grab main content area)
             if not sections:
-                 main_content = soup.find('main') or soup.find('article') or soup.find('div', role='main') or soup.body
-                 if main_content:
-                      sections['main_content'] = self._clean_text(main_content.get_text(separator=' ', strip=True))
+                main_content = soup.find('main') or soup.find('article') or soup.find('div', role='main') or soup.body
+                if main_content:
+                    sections['main_content'] = self._clean_text(main_content.get_text(separator=' ', strip=True))
 
         except Exception as e:
             logger.error(f"Error parsing HTML content: {e}", exc_info=True)
@@ -207,7 +235,6 @@ class ContentExtractor:
         logger.info(f"Processed {len(sections)} key-value pairs from JSON data.")
         return sections
 
-
     def _match_sections(self, extracted_sections: Dict[str, str]) -> Dict[str, str]:
         """Matches extracted section headers/keys to predefined SECTION_KEYWORDS."""
         matched_content = {}
@@ -215,16 +242,16 @@ class ContentExtractor:
 
         # Academic profile specific section mappings
         academic_mappings = {
-            'biography': ['bio', 'about', 'about me', 'introduction', 'background'],
-            'research': ['research', 'research interests', 'research focus', 'research areas', 'interests'],
-            'publications': ['publications', 'selected publications', 'recent publications', 'papers', 'research papers'],
-            'teaching': ['teaching', 'courses', 'education', 'teaching experience'],
+            'biography': ['bio', 'about', 'about me', 'introduction', 'background', 'profile'],
+            'research': ['research', 'research interests', 'research focus', 'research areas', 'interests', 'scholarly interests'],
+            'publications': ['publications', 'selected publications', 'recent publications', 'papers', 'research papers', 'journal articles', 'conference proceedings'],
+            'teaching': ['teaching', 'courses', 'education', 'teaching experience', 'courses taught'],
             'service': ['service', 'professional service', 'academic service', 'committee service'],
-            'awards': ['awards', 'honors', 'achievements', 'grants', 'funding'],
-            'education': ['education', 'academic background', 'degrees', 'phd', 'ph.d.'],
+            'awards': ['awards', 'honors', 'achievements', 'grants', 'funding', 'prizes'],
+            'education': ['education', 'academic background', 'degrees', 'phd', 'ph.d.', 'm.s.', 'b.s.'],
             'experience': ['experience', 'work experience', 'professional experience', 'positions'],
-            'contact': ['contact', 'contact information', 'email', 'address'],
-            'projects': ['projects', 'research projects', 'current projects', 'ongoing projects']
+            'contact': ['contact', 'contact information', 'email', 'address', 'office'],
+            'projects': ['projects', 'research projects', 'current projects', 'ongoing projects', 'funded projects']
         }
 
         # First pass: exact and close matches
@@ -290,14 +317,14 @@ class ContentExtractor:
                 continue
 
             # Handle publications with specific formats
-            if any(venue in source_content for venue in ['ACM', 'IEEE', 'USENIX', 'CCS', 'S&P', 'NDSS']):
+            if any(venue in source_content for venue in ['ACM', 'IEEE', 'USENIX', 'CCS', 'S&P', 'NDSS', 'arXiv']):
                 if 'publications' not in matched_content:
                     matched_content['publications'] = source_content
                     used_keys.add(source_key)
                     logger.debug(f"Venue-based match: '{source_key}' to 'publications'")
 
             # Handle education with degree indicators
-            elif any(degree in source_content for degree in ['PhD', 'Ph.D.', 'M.S.', 'M.Sc.', 'B.S.', 'B.Sc.']):
+            elif any(degree in source_content for degree in ['PhD', 'Ph.D.', 'M.S.', 'M.Sc.', 'B.S.', 'B.Sc.', 'Bachelor', 'Master', 'Doctorate']):
                 if 'education' not in matched_content:
                     matched_content['education'] = source_content
                     used_keys.add(source_key)
@@ -312,7 +339,6 @@ class ContentExtractor:
 
         logger.info(f"Mapped extracted content to {len(matched_content)} target sections.")
         return matched_content
-
 
     def find_sections(self, raw_content: str, source_tool: str = "browser-use") -> Dict[str, str]:
         """Extracts sections from raw content based on the source tool."""
@@ -472,7 +498,6 @@ class DataStructurer:
             logger.error(f"Error processing LLM list item response: {e}", exc_info=True)
             return []
 
-
     def structure_data(self, clean_content_dict: Dict[str, str], schema: Dict[str, Any]) -> Dict[str, Any]:
         """
         Populates a structured dictionary based on the schema and cleaned content.
@@ -565,9 +590,28 @@ class DataStructurer:
             except Exception as sort_err:
                 logger.warning(f"Could not sort publications: {sort_err}")
 
+        # Ensure the output is valid JSON
+        try:
+            json.dumps(structured_data)  # Test if the data is JSON serializable
+            logger.info("Successfully structured data into valid JSON format.")
+        except (TypeError, ValueError) as e:
+            logger.error(f"Error in JSON serialization: {e}")
+            # Clean up any non-serializable data
+            structured_data = self._clean_non_serializable(structured_data)
 
-        logger.info("Data structuring complete.")
         return structured_data
+
+    def _clean_non_serializable(self, data: Any) -> Any:
+        """Recursively clean non-serializable data for JSON output."""
+        if isinstance(data, dict):
+            return {k: self._clean_non_serializable(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._clean_non_serializable(item) for item in data]
+        elif isinstance(data, (int, float, str, bool, type(None))):
+            return data
+        else:
+            # Convert any other type to string
+            return str(data)
 
 
 # --- Quality Control ---
@@ -591,7 +635,6 @@ class QualityControl:
                  present_fields += 1
             elif is_required:
                  missing_fields.append(field)
-
 
         completeness_score = present_fields / total_fields if total_fields > 0 else 1.0
         logger.info(f"Completeness check: {present_fields}/{total_fields} fields populated. Missing required: {missing_fields}")
@@ -623,7 +666,6 @@ class QualityControl:
                                  potential_duplicates_indices.add(j)
                                  logger.debug(f"Potential duplicate found in '{field}' (Score: {score}): {item1_str} vs {item2_str}")
 
-
                   if potential_duplicates_indices:
                        duplicates[field] = [items[idx] for idx in sorted(list(potential_duplicates_indices))]
 
@@ -633,38 +675,61 @@ class QualityControl:
              logger.info("No significant duplicates detected in list fields.")
         return duplicates
 
-    def _annotate_temporal_relevance(self, structured_data: Dict, schema: Dict) -> Dict:
-        """Adds simple temporal flags (e.g., 'recent publication'). Placeholder."""
-        # This requires more sophisticated date handling and comparison logic
-        # Example: Flag publications within the last 2 years as 'recent'
-        # annotations = {}
-        # if 'publications' in structured_data and isinstance(structured_data['publications'], list):
-        #     recent_pubs = []
-        #     current_year = datetime.now().year
-        #     for pub in structured_data['publications']:
-        #         pub_year = pub.get('year') # Assuming 'year' field exists
-        #         if pub_year and isinstance(pub_year, int) and current_year - pub_year <= 2:
-        #              recent_pubs.append(pub.get('title', 'Unknown Title'))
-        #     if recent_pubs:
-        #          annotations['recent_publications'] = recent_pubs
-        # logger.info("Temporal annotation check complete.")
-        # return annotations
-        logger.info("Temporal annotation check skipped (placeholder).")
-        return {} # Placeholder
+    def _check_academic_content_quality(self, structured_data: Dict) -> Dict[str, Any]:
+        """Performs specific quality checks for academic content."""
+        quality_issues = {
+            'missing_sections': [],
+            'incomplete_sections': [],
+            'format_issues': [],
+            'suggestions': []
+        }
 
+        # Check for required academic sections
+        required_sections = ['biography', 'research', 'publications', 'education']
+        for section in required_sections:
+            if section not in structured_data or not structured_data[section]:
+                quality_issues['missing_sections'].append(section)
+
+        # Check publication format
+        if 'publications' in structured_data and isinstance(structured_data['publications'], list):
+            for pub in structured_data['publications']:
+                if isinstance(pub, dict):
+                    if not pub.get('title') or not pub.get('authors'):
+                        quality_issues['format_issues'].append(f"Publication missing title or authors: {pub}")
+                    if not pub.get('year'):
+                        quality_issues['suggestions'].append(f"Publication missing year: {pub.get('title', 'Unknown')}")
+
+        # Check education format
+        if 'education' in structured_data and isinstance(structured_data['education'], list):
+            for edu in structured_data['education']:
+                if isinstance(edu, dict):
+                    if not edu.get('degree') or not edu.get('institution'):
+                        quality_issues['format_issues'].append(f"Education entry missing degree or institution: {edu}")
+                    if not edu.get('year'):
+                        quality_issues['suggestions'].append(f"Education entry missing year: {edu.get('degree', 'Unknown')}")
+
+        # Check research content
+        if 'research' in structured_data:
+            research_content = structured_data['research']
+            if isinstance(research_content, str) and len(research_content.split()) < 50:
+                quality_issues['incomplete_sections'].append('research')
+            elif isinstance(research_content, dict) and not research_content.get('summary'):
+                quality_issues['incomplete_sections'].append('research')
+
+        return quality_issues
 
     def run_quality_checks(self, structured_data: Dict, schema: Dict) -> Dict:
         """Orchestrates all quality checks."""
         logger.info("Running quality control checks...")
         completeness_score, missing_required = self._check_completeness(structured_data, schema)
         duplicates_found = self._detect_duplicates(structured_data, schema)
-        temporal_annotations = self._annotate_temporal_relevance(structured_data, schema) # Placeholder
+        academic_quality = self._check_academic_content_quality(structured_data)
 
         qc_report = {
             "completeness_score": completeness_score,
             "missing_required_fields": missing_required,
             "potential_duplicates": duplicates_found,
-            "temporal_annotations": temporal_annotations, # Placeholder
+            "academic_content_quality": academic_quality,
             "notes": []
         }
 
@@ -672,6 +737,12 @@ class QualityControl:
              qc_report["notes"].append("Low data completeness.")
         if duplicates_found:
              qc_report["notes"].append("Potential duplicate items detected in lists.")
+        if academic_quality['missing_sections']:
+             qc_report["notes"].append(f"Missing important academic sections: {', '.join(academic_quality['missing_sections'])}")
+        if academic_quality['format_issues']:
+             qc_report["notes"].append(f"Format issues found in {len(academic_quality['format_issues'])} entries.")
+        if academic_quality['suggestions']:
+             qc_report["notes"].append(f"Suggestions for improvement: {len(academic_quality['suggestions'])} items.")
 
         logger.info("Quality control checks completed.")
         return qc_report

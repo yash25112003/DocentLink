@@ -1,0 +1,173 @@
+{
+    "version": "v17",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "affiliation": {
+                    "type": "string"
+                },
+                "contact_info": {
+                    "type": "object",
+                    "properties": {
+                        "email": {
+                            "type": "string",
+                            "format": "email"
+                        },
+                        "phone": {
+                            "type": "string"
+                        },
+                        "office": {
+                            "type": "string"
+                        },
+                        "website": {
+                            "type": "string",
+                            "format": "url"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "full_name",
+                "title",
+                "affiliation"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "markdown": {
+                    "type": "string"
+                }
+            }
+        },
+        "recent_updates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                }
+            }
+        },
+        "research": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "publication_url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "code_url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                }
+            }
+        },
+        "service": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "organization": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "role": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "authors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "journal_or_conference": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "doi": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "institution": {
+                        "type": "string"
+                    },
+                    "degree": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "awards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "awarding_body": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                }
+            }
+        }
+    },
+    "documentation": "This schema (v17) extends v16 by adding a 'recent_updates' array to capture recent activities,  restructuring 'research' into an array of objects for better organization, and improving the 'service' section to include a 'role' field for clarity.  The 'education' section is also restructured into an array of objects for a more flexible representation of educational history.  All other fields remain consistent with v16, but with improved data type definitions for better data integrity."
+}
