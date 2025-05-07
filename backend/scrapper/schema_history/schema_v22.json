@@ -1,0 +1,151 @@
+{
+    "version": "v22",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "affiliation": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "title"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "markdown": {
+                    "type": "string"
+                },
+                "html": {
+                    "type": "string"
+                }
+            }
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string"
+                },
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "publications": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string"
+                            },
+                            "authors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "journal": {
+                                "type": "string"
+                            },
+                            "year": {
+                                "type": "integer"
+                            },
+                            "link": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                },
+                "service": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "courses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "term": {
+                                "type": "string"
+                            },
+                            "link": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "description",
+                            "term"
+                        ]
+                    }
+                },
+                "committees": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "other": {
+            "type": "object",
+            "properties": {
+                "activities": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "links": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "format": "url"
+                                }
+                            }
+                        },
+                        "required": [
+                            "description"
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "documentation": "This schema (v22) extends v21 by adding fields for 'research.updates' and 'research.service' as arrays of strings to accommodate the extracted content.  It also adds a 'research.publications' array of objects, each with properties for title, authors, journal, year, and link.  The 'personal_info' section no longer requires 'affiliation' as it's not present in the extracted data.  All other fields remain consistent with v21.  Data types are chosen to accurately reflect the input data. URL validation is applied where appropriate using the 'format: url' keyword."
+}

@@ -63,27 +63,27 @@ class ContentExtractor:
         
         # If no sections found with patterns, try heading-based parsing
         if not sections:
-            # Split the markdown into lines
-            lines = markdown_text.split('\n')
-            
-            for line in lines:
-                # Check for headings (both ATX and Setext styles)
-                if line.startswith('#') or (len(line) > 0 and all(c == '=' for c in line.strip()) or all(c == '-' for c in line.strip())):
-                    # If we have a current section, save it
-                    if current_section and current_content:
-                        sections[current_section] = '\n'.join(current_content).strip()
-                    
-                    # Start new section
-                    current_section = line.strip('#=- ').lower()
-                    current_content = []
-                else:
-                    # Add line to current section if we have one
-                    if current_section:
-                        current_content.append(line)
-            
-            # Save the last section
-            if current_section and current_content:
-                sections[current_section] = '\n'.join(current_content).strip()
+        # Split the markdown into lines
+        lines = markdown_text.split('\n')
+        
+        for line in lines:
+            # Check for headings (both ATX and Setext styles)
+            if line.startswith('#') or (len(line) > 0 and all(c == '=' for c in line.strip()) or all(c == '-' for c in line.strip())):
+                # If we have a current section, save it
+                if current_section and current_content:
+                    sections[current_section] = '\n'.join(current_content).strip()
+                
+                # Start new section
+                current_section = line.strip('#=- ').lower()
+                current_content = []
+            else:
+                # Add line to current section if we have one
+                if current_section:
+                    current_content.append(line)
+        
+        # Save the last section
+        if current_section and current_content:
+            sections[current_section] = '\n'.join(current_content).strip()
         
         # If still no sections, try to extract content between major headings
         if not sections:
@@ -152,51 +152,51 @@ class ContentExtractor:
 
             # Process headers first
             for header in headers:
-                header_text = self._clean_text(header.get_text())
-                if not header_text or header in processed_elements:
-                    continue
+                 header_text = self._clean_text(header.get_text())
+                 if not header_text or header in processed_elements:
+                      continue
 
-                content = []
-                # Find siblings until the next header or a limiting tag
-                for sibling in header.find_next_siblings():
-                    if sibling.name.startswith('h') or sibling.name in ['section', 'footer', 'nav']: # Stop at next header or major section break
-                        break
-                    if sibling not in processed_elements:
-                        # Check if sibling is a container with relevant info
-                        if isinstance(sibling, Tag):
-                            # Avoid adding empty containers or script tags
-                            if sibling.name == 'script' or not sibling.get_text(strip=True):
-                                continue
-                            content.append(sibling.get_text(separator=' ', strip=True))
-                            processed_elements.add(sibling) # Mark as processed
-                        elif isinstance(sibling, NavigableString) and sibling.strip():
-                            content.append(sibling.strip())
-                            # Cannot add NavigableString to set, but its content is captured
+                 content = []
+                 # Find siblings until the next header or a limiting tag
+                 for sibling in header.find_next_siblings():
+                      if sibling.name.startswith('h') or sibling.name in ['section', 'footer', 'nav']: # Stop at next header or major section break
+                           break
+                      if sibling not in processed_elements:
+                           # Check if sibling is a container with relevant info
+                           if isinstance(sibling, Tag):
+                                # Avoid adding empty containers or script tags
+                                if sibling.name == 'script' or not sibling.get_text(strip=True):
+                                     continue
+                                content.append(sibling.get_text(separator=' ', strip=True))
+                                processed_elements.add(sibling) # Mark as processed
+                           elif isinstance(sibling, NavigableString) and sibling.strip():
+                                content.append(sibling.strip())
+                                # Cannot add NavigableString to set, but its content is captured
 
-                if header_text and content:
-                    sections[header_text] = self._clean_text(" ".join(content))
-                    processed_elements.add(header)
+                 if header_text and content:
+                      sections[header_text] = self._clean_text(" ".join(content))
+                      processed_elements.add(header)
 
             # Add content from specifically identified sections (Strategy 1) if not already captured
             for section_tag in potential_sections:
-                if section_tag in processed_elements:
-                    continue
-                # Try to find a representative header within the section or use ID/class
-                section_header_tag = section_tag.find(['h2', 'h3', 'h4'])
-                section_key = self._clean_text(section_header_tag.get_text()) if section_header_tag else section_tag.get('id') or (section_tag.get('class') and section_tag.get('class')[0])
-                section_key = section_key or f"section_{len(sections)}" # Fallback key
+                 if section_tag in processed_elements:
+                      continue
+                 # Try to find a representative header within the section or use ID/class
+                 section_header_tag = section_tag.find(['h2', 'h3', 'h4'])
+                 section_key = self._clean_text(section_header_tag.get_text()) if section_header_tag else section_tag.get('id') or (section_tag.get('class') and section_tag.get('class')[0])
+                 section_key = section_key or f"section_{len(sections)}" # Fallback key
 
-                section_content = self._clean_text(section_tag.get_text(separator=' ', strip=True))
+                 section_content = self._clean_text(section_tag.get_text(separator=' ', strip=True))
 
-                if section_key and section_content and section_key not in sections:
-                    sections[section_key] = section_content
-                    processed_elements.add(section_tag) # Add container to processed
+                 if section_key and section_content and section_key not in sections:
+                      sections[section_key] = section_content
+                      processed_elements.add(section_tag) # Add container to processed
 
             # Basic cleanup if no sections found (e.g., grab main content area)
             if not sections:
-                main_content = soup.find('main') or soup.find('article') or soup.find('div', role='main') or soup.body
-                if main_content:
-                    sections['main_content'] = self._clean_text(main_content.get_text(separator=' ', strip=True))
+                 main_content = soup.find('main') or soup.find('article') or soup.find('div', role='main') or soup.body
+                 if main_content:
+                      sections['main_content'] = self._clean_text(main_content.get_text(separator=' ', strip=True))
 
         except Exception as e:
             logger.error(f"Error parsing HTML content: {e}", exc_info=True)

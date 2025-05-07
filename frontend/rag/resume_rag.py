@@ -19,6 +19,8 @@ from qdrant_client.models import SearchParams
 import warnings
 import re # Import regex for cleaning
 import math # For ceiling division
+from io import BytesIO
+from transformers import AutoTokenizer, AutoModel
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -38,8 +40,7 @@ def prepare_query(query):
 
 # --- PDFProcessor Class (MODIFIED for improved section and project handling) ---
 class PDFProcessor:
-    def __init__(self, model_name='all-mpnet-base-v2'): # Removed chunk_strategy from init as it's handled internally now
-        """Initialize with embedding model."""
+    def __init__(self, model_name='all-mpnet-base-v2'):
         self.text_model = SentenceTransformer(model_name)
         self.embedding_dim = self.text_model.get_sentence_embedding_dimension()
         # *** UPDATED Section Headers and Keywords ***
@@ -48,8 +49,8 @@ class PDFProcessor:
             "EDUCATION": ["EDUCATION", "ACADEMIC BACKGROUND", "ACADEMIC QUALIFICATIONS"],
             "EXPERIENCE": ["EXPERIENCE", "WORK HISTORY", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE", "WORK EXPERIENCE"],
             "SKILLS": ["SKILLS", "TECHNICAL SKILLS", "COMPETENCIES", "EXPERTISE"],
-            "PROJECTS": ["PROJECTS", "RESEARCH PROJECTS", "PERSONAL PROJECTS", "ACADEMIC PROJECTS", "PAPERS", "RESEARCH", "CONTRIBUTIONS", "PORTFOLIO"], # Expanded project keywords
-            "CERTIFICATIONS": ["CERTIFICATIONS", "CERTIFICATES", "ACCREDITATIONS", "COURSES"], # Added COURSES here
+            "PROJECTS": ["PROJECTS", "RESEARCH PROJECTS", "PERSONAL PROJECTS", "ACADEMIC PROJECTS", "PAPERS", "RESEARCH", "CONTRIBUTIONS", "PORTFOLIO"],
+            "CERTIFICATIONS": ["CERTIFICATIONS", "CERTIFICATES", "ACCREDITATIONS", "COURSES"],
             "PUBLICATIONS": ["PUBLICATIONS", "PUBLICATIONS AND PRESENTATIONS"],
             "AWARDS": ["AWARDS", "HONORS", "ACCOMPLISHMENTS"],
             "LANGUAGES": ["LANGUAGES", "LANGUAGE PROFICIENCY"],
@@ -60,9 +61,7 @@ class PDFProcessor:
         }
         # Flatten keywords for quick lookup during line iteration
         self._all_section_keywords = {keyword: section_type for section_type, keywords in self.section_keywords.items() for keyword in keywords}
-
         self.chunk_size_limit = 500 # Define a soft chunk size limit for splitting within sections
-
         print(f"✅ PDFProcessor initialized with model: {model_name} (dim: {self.embedding_dim})")
         print(f"    Recognized Section Types and Keywords: {self.section_keywords}")
 
@@ -79,78 +78,36 @@ class PDFProcessor:
         text = re.sub(r'•\s+', '• ', text) # Normalize space after bullet point
         return text.strip()
 
-
-    # *** REVISED extract_from_pdf for section-aware paragraph chunking ***
-    def extract_from_pdf(self, file_path):
-        """Extract text and chunk it, preserving sections and splitting large sections by paragraph."""
-        all_chunks = []
-        raw_first_page_text = ""
-        current_section = "Introduction"
-        current_section_lines = []
-        chunk_index_counter = 0
-
+    def extract_from_pdf(self, pdf_file):
+        """Extract text from PDF file (either file path or BytesIO object) and return chunks and first page."""
         try:
-            doc = fitz.open(file_path)
-            for page_num, page in enumerate(doc):
-                # Use 'text' output for better layout preservation, fallback to plain text
-                text = page.get_text("text")
-                if not text.strip():
-                    text = page.get_text() # Fallback
-
-                if page_num == 0:
-                    raw_first_page_text = text # For name extraction
-
-                lines = text.split('\n')
-                for line in lines:
-                    cleaned_line = line.strip()
-                    if not cleaned_line:
-                        continue # Skip empty lines
-
-                    is_header = False
-                    line_upper = cleaned_line.upper()
-
-                    # Check if the line matches a section header keyword
-                    matched_section_type = None
-                    for keyword, section_type in self._all_section_keywords.items():
-                         # Use word boundaries and check if the keyword is a significant part of the line
-                         if re.search(r'\b' + re.escape(keyword) + r'\b', line_upper) and (len(line_upper.split()) <= 5 or line_upper.strip() == keyword):
-                             matched_section_type = section_type
-                             is_header = True
-                             break # Found a header, break from keyword loop
-
-                    if is_header:
-                        # Process the previous section's accumulated lines
-                        if current_section_lines:
-                            # Clean and split the accumulated text by paragraphs
-                            section_text = "\n".join(current_section_lines)
-                            self._add_section_chunks(all_chunks, current_section, section_text, page_num, chunk_index_counter)
-                            chunk_index_counter = len(all_chunks) # Update counter based on added chunks
-
-                        # Start accumulating lines for the new section
-                        current_section = matched_section_type
-                        current_section_lines = [cleaned_line] # Include the header line in the new section's content
-                    else:
-                        # Add non-header lines to the current section's lines
-                        current_section_lines.append(cleaned_line)
-
-            # Process the last section after the loop finishes
-            if current_section_lines:
-                 self._add_section_chunks(all_chunks, current_section, "\n".join(current_section_lines), doc.page_count - 1, chunk_index_counter)
-                 # No need to update chunk_index_counter here as we are done
-
+            if isinstance(pdf_file, str):
+                # Handle file path
+                doc = fitz.open(pdf_file)
+            else:
+                # Handle BytesIO or StreamlitUploadedFile
+                doc = fitz.open(stream=pdf_file.getvalue() if hasattr(pdf_file, 'getvalue') else pdf_file, filetype="pdf")
+                
+            # Extract first page text for candidate name
+            raw_first_page = doc[0].get_text() if doc.page_count > 0 else ""
+            
+            # Extract text from all pages
+            text = ""
+            for page in doc:
+                text += page.get_text() + "\n"
+                
+            # Clean and chunk the text
+            cleaned_text = self.clean_text(text)
+            chunks = self.chunk_text(cleaned_text)
+            
+            # Close the document
             doc.close()
-            print(f"📄 Extracted and chunked into {len(all_chunks)} chunks.")
-
-            # Debug: Print first few chunks
-            # for i, c in enumerate(all_chunks[:10]):
-            #      print(f"  Chunk {i}: Page {c['page']}, Idx: {c['chunk_index']}, Section: {c.get('section', 'N/A')}, Text: {c['text'][:150]}...")
-
-            return all_chunks, raw_first_page_text
+            
+            return chunks, raw_first_page
+            
         except Exception as e:
-            print(f"❌ Error extracting/chunking PDF {os.path.basename(file_path)}: {str(e)}")
-            # import traceback
-            # traceback.print_exc()
-            return [], ""
+            print(f"❌ Error extracting text from PDF: {str(e)}")
+            return None, None
 
     def _add_section_chunks(self, all_chunks_list, section_name, section_text, page_num, start_chunk_index):
         """Splits section text into smaller chunks (paragraphs) and adds to the main list."""
@@ -198,6 +155,37 @@ class PDFProcessor:
                 "section": section_name
             })
 
+    def chunk_text(self, text):
+        """Split text into chunks of about 500 characters, preserving paragraph boundaries."""
+        paragraphs = re.split(r'\n{2,}', text)
+        chunks = []
+        current_chunk = ""
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            if len(current_chunk) + len(para) + 2 > self.chunk_size_limit:
+                if current_chunk:
+                    chunks.append({
+                        "text": current_chunk.strip(),
+                        "page": 1,  # Page info not available here
+                        "chunk_index": len(chunks),
+                        "section": "Unknown"
+                    })
+                current_chunk = para
+            else:
+                if current_chunk:
+                    current_chunk += "\n\n"
+                current_chunk += para
+        if current_chunk:
+            chunks.append({
+                "text": current_chunk.strip(),
+                "page": 1,
+                "chunk_index": len(chunks),
+                "section": "Unknown"
+            })
+        return chunks
+
     # --- extract_candidate_name (Keep as is) ---
     def extract_candidate_name(self, raw_first_page_text):
         if not raw_first_page_text: return "Unknown Candidate"
@@ -230,10 +218,10 @@ class PDFProcessor:
 
     # --- embed_text (Keep as is) ---
     def embed_text(self, chunk_dicts, batch_size=32):
-        embeddings = []; texts_to_embed = [chunk['text'] for chunk in chunk_dicts if chunk.get('text')]
-        if not texts_to_embed: return embeddings
-        # print(f"⏳ Generating embeddings for {len(texts_to_embed)} text chunks...")
-        # Use math.ceil for ceiling division to get correct batch count
+        embeddings = []
+        texts_to_embed = [chunk['text'] for chunk in chunk_dicts if chunk.get('text')]
+        if not texts_to_embed:
+            return embeddings
         total_batches = math.ceil(len(texts_to_embed) / batch_size)
         for batch in tqdm(batch_iterate(texts_to_embed, batch_size), total=total_batches, desc="Embedding", leave=False):
             try:
@@ -242,7 +230,6 @@ class PDFProcessor:
             except Exception as e:
                 print(f"❌ Error embedding batch: {e}")
                 embeddings.extend([[0.0] * self.embedding_dim] * len(batch))
-        # print(f"✅ Embeddings generated.")
         return embeddings
 
 # --- ResumeVectorDB Class (Keep as is) ---
@@ -679,3 +666,144 @@ if __name__ == "__main__":
         else: print("❌ Error: Resume RAG system could not be initialized.")
 
     print(f"\n--- Total Execution Time: {time.time() - main_start_time:.2f} seconds ---")
+
+def process_single_resume(pdf_file, collection_name=None, force_recreate_collection=False):
+    """Process a single PDF file from Streamlit uploader and return RAG system for querying."""
+    if not pdf_file:
+        print("❌ No PDF file provided")
+        return None, None
+    print(f"\n--- Processing: {pdf_file.name} ---")
+    # Extract candidate name for collection naming
+    pdf_processor = PDFProcessor(model_name='all-mpnet-base-v2')
+    # Process the PDF directly from memory to get candidate name
+    chunks, raw_first_page = pdf_processor.extract_from_pdf(pdf_file)
+    if not chunks:
+        print(f"⚠️ No chunks extracted from {pdf_file.name}")
+        return None, None
+    candidate_name = pdf_processor.extract_candidate_name(raw_first_page)
+    # Use candidate name or file name for collection
+    safe_name = candidate_name if candidate_name != "Unknown Candidate" else os.path.splitext(pdf_file.name)[0]
+    safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', safe_name).lower()
+    collection_name = collection_name or f"resume_{safe_name}"
+    vector_db = ResumeVectorDB(collection_name=collection_name, text_vector_dim=pdf_processor.embedding_dim)
+    vector_db.define_client()
+    if not vector_db.client:
+        print("❌ Halting: Qdrant client failed.")
+        return None, None
+    # Only create collection if it doesn't exist
+    try:
+        vector_db.client.get_collection(collection_name=f"{collection_name}_text")
+        # Collection exists, do not recreate
+        vector_db.create_collection(force_recreate=False)
+    except Exception:
+        # Collection does not exist, create new
+        vector_db.create_collection(force_recreate=True)
+    try:
+        document_id = os.path.splitext(pdf_file.name)[0].upper()
+        candidate_id = re.sub(r'\s+', '_', candidate_name.lower().strip()) if candidate_name != "Unknown Candidate" else document_id.lower() + "_candidate"
+        candidate_map = {
+            candidate_id: {
+                "name": candidate_name,
+                "docs": [document_id]
+            }
+        }
+        text_embeddings = pdf_processor.embed_text(chunks)
+        if not text_embeddings or len(text_embeddings) != len(chunks):
+            print(f"⚠️ Embedding failed/mismatch for {pdf_file.name}")
+            return None, None
+        success = vector_db.ingest_text_data(text_embeddings, chunks, document_id, candidate_id, candidate_name)
+        if not success:
+            print(f"⚠️ Failed to ingest data for {pdf_file.name}")
+            return None, None
+        print(f"✅ Successfully processed {pdf_file.name}")
+        retriever = ResumeRetriever(vector_db, pdf_processor)
+        rag = ResumeRAG(retriever)
+        return rag, candidate_map
+    except Exception as e:
+        print(f"❌ Error processing {pdf_file.name}: {str(e)}")
+        return None, None
+
+def resume_rag_main(
+    pdf_file,  # Streamlit UploadedFile
+    target_candidate_name: str = None,
+    queries: list = None,
+    force_recreate: bool = False,
+    qdrant_collection: str = None
+):
+    """
+    Processes a single resume PDF, runs RAG queries, and returns results.
+    Args:
+        pdf_file: Streamlit UploadedFile object containing the resume PDF
+        target_candidate_name: Name of candidate to query (defaults to extracted name)
+        queries: List of queries to run (defaults to standard set)
+        force_recreate: Whether to recreate the Qdrant collection
+        qdrant_collection: Name of Qdrant collection (auto-generated from candidate name if not provided)
+    Returns:
+        Dictionary containing:
+        - 'resume_rag': Initialized RAG system
+        - 'candidate': Processed candidate data
+        - 'results': Query results
+        - 'execution_time': Total runtime
+        - 'qdrant_collection': The collection name used
+    """
+    if queries is None:
+        queries = [
+            "What is the candidate's name and contact details?",
+            "List all technical skills mentioned.",
+            "Summarize work experience in detail",
+            "List all academic projects and papers with technologies used",
+            "What courses and certifications are listed?",
+            "Summarize the candidate's education",
+            "What programming languages does the candidate know?"
+        ]
+    start_time = time.time()
+    results = {
+        'resume_rag': None,
+        'candidate': None,
+        'results': [],
+        'execution_time': 0
+    }
+    # Process the uploaded PDF
+    rag_system, candidate_map = process_single_resume(
+        pdf_file=pdf_file,
+        collection_name=qdrant_collection,  # Pass collection name if provided
+        force_recreate_collection=force_recreate
+    )
+    if not (rag_system and candidate_map):
+        print("❌ Error: Resume processing failed")
+        return results
+    # Get the processed candidate info
+    candidate_id = next(iter(candidate_map))
+    candidate_info = candidate_map[candidate_id]
+    candidate_name = target_candidate_name or candidate_info["name"]
+    # Auto-generate qdrant_collection if not provided
+    if not qdrant_collection:
+        safe_name = candidate_name if candidate_name != "Unknown Candidate" else os.path.splitext(pdf_file.name)[0]
+        safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', safe_name).lower()
+        qdrant_collection = f"resume_{safe_name}"
+    print(f"\n🎯 Querying for candidate: '{candidate_name}' (ID: '{candidate_id}')")
+    # Execute queries
+    for query in queries:
+        print(f"\n❓ Query: {query}")
+        q_start_time = time.time()
+        result = rag_system.query(
+            query=query,
+            candidate_id=candidate_id,
+            candidate_name=candidate_name
+        )
+        print(f"💬 Answer:\n{result}")
+        print(f"   (Query time: {time.time() - q_start_time:.2f}s)")
+        print("-" * 30)
+        results['results'].append({
+            'query': query,
+            'answer': result,
+            'time': time.time() - q_start_time
+        })
+    results.update({
+        'resume_rag': rag_system,
+        'candidate': candidate_info,
+        'execution_time': time.time() - start_time,
+        'qdrant_collection': qdrant_collection
+    })
+    print(f"\n--- Total Execution Time: {results['execution_time']:.2f} seconds ---")
+    return results

@@ -1,150 +1,113 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Academic Profile",
-  "description": "Schema for representing an academic profile.",
   "type": "object",
   "properties": {
     "biography": {
       "type": "object",
       "properties": {
-        "markdown": {
+        "content": {
           "type": "string",
-          "description": "Biography in Markdown format."
+          "description": "Biographical information. May contain Markdown or HTML.  Error messages will be included if extraction failed."
         },
-        "html": {
+        "extractionStatus": {
           "type": "string",
-          "description": "Biography in HTML format (optional)."
+          "description": "Indicates the success or failure of content extraction.  e.g., 'success', 'failed', 'partial'",
+          "enum": [
+            "success",
+            "failed",
+            "partial"
+          ]
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "Error message if content extraction failed."
         }
       },
       "required": [
-        "markdown"
+        "content",
+        "extractionStatus"
       ]
     },
-    "research": {
-      "type": "object",
-      "properties": {
-        "summary": {
-          "type": "string",
-          "description": "Summary of research interests."
-        },
-        "interests": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of research interests."
-        },
-        "projects": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "title": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "publications": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/publication"
-                }
-              }
-            },
-            "required": [
-              "title"
-            ]
-          }
-        },
-        "awards": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string",
-                "format": "url"
-              }
-            },
-            "required": [
-              "name"
-            ]
-          }
-        },
-        "funding": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "agency": {
-                "type": "string"
-              },
-              "amount": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string"
-              },
-              "year": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "agency",
-              "title"
-            ]
-          }
-        }
-      },
-      "required": [
-        "summary"
-      ]
+    "researchInterests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "List of research interests."
+      }
     },
     "publications": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/publication"
-      }
-    },
-    "teaching": {
-      "type": "array",
-      "items": {
         "type": "object",
         "properties": {
-          "courseName": {
+          "title": {
             "type": "string"
           },
-          "semester": {
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "journal": {
             "type": "string"
           },
           "year": {
             "type": "integer"
           },
-          "details": {
+          "volume": {
+            "type": "string"
+          },
+          "issue": {
+            "type": "string"
+          },
+          "pages": {
+            "type": "string"
+          },
+          "doi": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "abstract": {
             "type": "string"
           }
         },
         "required": [
-          "courseName"
+          "title",
+          "authors"
         ]
       }
     },
-    "service": {
+    "awards": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "role": {
+          "name": {
             "type": "string"
           },
-          "organization": {
+          "year": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "degree": {
+            "type": "string"
+          },
+          "institution": {
             "type": "string"
           },
           "year": {
@@ -152,8 +115,8 @@
           }
         },
         "required": [
-          "role",
-          "organization"
+          "degree",
+          "institution"
         ]
       }
     },
@@ -163,52 +126,13 @@
         "email": {
           "type": "string",
           "format": "email"
-        }
-      },
-      "required": [
-        "email"
-      ]
-    }
-  },
-  "definitions": {
-    "publication": {
-      "type": "object",
-      "properties": {
-        "title": {
-          "type": "string"
         },
-        "authors": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "venue": {
-          "type": "string"
-        },
-        "year": {
-          "type": "integer"
-        },
-        "url": {
+        "website": {
           "type": "string",
           "format": "url"
-        },
-        "type": {
-          "type": "string",
-          "enum": [
-            "journal",
-            "conference",
-            "book",
-            "other"
-          ]
         }
-      },
-      "required": [
-        "title",
-        "authors",
-        "venue",
-        "year"
-      ]
+      }
     }
-  }
+  },
+  "additionalProperties": true
 }

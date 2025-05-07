@@ -1,0 +1,4 @@
+pymongo
+streamlit
+python-dotenv
+dnspython

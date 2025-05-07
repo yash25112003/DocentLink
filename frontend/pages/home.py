@@ -2,33 +2,56 @@ import streamlit as st
 import os
 import pandas as pd
 from typing import List, Optional
+import uuid
+from datetime import datetime
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# Now you can import
+from frontend.rag.resume_rag import resume_rag_main
+
+# Add the backend directory to Python path
+backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../backend'))
+sys.path.append(backend_path)
+
+# Import the DatabaseManager
+from db_manager import DatabaseManager
+
+# Initialize database manager
+db = DatabaseManager()
 
 # Cache the professor data loading
 @st.cache_data
 def load_professor_data(university: str) -> List[str]:
     """
-    Load professor data from CSV file with caching.
-    Future enhancement: Replace with database integration
+    Load professor data from university-specific CSV file.
+    Returns list of professors for the given university.
     """
-    file_path = f"/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/data/prof_data/{sanitize_university_name(university)}"
     try:
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
+        # Sanitize university name for filename
+        safe_university = sanitize_university_name(university)
+        
+        # Look for university-specific CSV file
+        csv_path = os.path.join(os.path.dirname(__file__), f'../../data/prof_data/{safe_university}.csv')
+        
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
             if 'Name' in df.columns:
                 return df['Name'].tolist()
             else:
-                st.warning(f"Unexpected format in {file_path}. Falling back to default professor names.")
+                st.warning(f"CSV file for {university} exists but doesn't have a 'name' column")
+                return []
         else:
-            st.warning(f"No professor data available for {university}. Falling back to default professor names.")
+            st.warning(f"No CSV file found for {university} at {csv_path}")
+            return []
+            
     except Exception as e:
-        st.error(f"Error loading professor data: {e}")
-    
-    # Return default professors
-    return ["Dr. Smith", "Prof. Johnson", "Dr. Brown", "Prof. Davis", "Dr. Wilson"]
+        st.error(f"Error loading professor data: {str(e)}")
+        return []
 
 def sanitize_university_name(name: str) -> str:
     """Convert university name to lowercase with underscores for file naming"""
-    return name.lower().replace(" ", "_") + ".csv"
+    return name.lower().replace(" ", "_")
 
 # Initialize session state
 if 'page' not in st.session_state:
@@ -43,6 +66,21 @@ if 'selected_professors' not in st.session_state:
     st.session_state.selected_professors = []
 if 'uploaded_file' not in st.session_state:
     st.session_state.uploaded_file = None
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = str(uuid.uuid4())
+    # Create a new user entry in MongoDB
+    user_data = {
+        'user_id': st.session_state.user_id,
+        'name': None,
+        'email': None,
+        'university': None,
+        'professors': [],
+        'file_name': None,
+        'status': 'incomplete',
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow()
+    }
+    db.create_user_profile(user_data)
 
 # Custom CSS
 st.markdown("""
@@ -71,6 +109,11 @@ st.markdown("""
 # Common title across pages
 st.markdown("<div class='main-title'>AskMyProf</div>", unsafe_allow_html=True)
 
+def update_user_data(update_fields: dict):
+    """Helper function to update user data in MongoDB"""
+    update_fields['updated_at'] = datetime.utcnow()
+    db.update_user_profile(st.session_state.user_id, update_fields)
+
 def page_one():
     """University Selection Page"""
     with st.form(key="page_one_form"):
@@ -92,6 +135,12 @@ def page_one():
             if st.session_state.university != university:
                 st.session_state.submission_success = False
                 st.session_state.selected_professors = []
+                
+            # Update user profile in MongoDB
+            update_user_data({
+                'university': university,
+                'status': 'university_selected'
+            })
                 
             # Store values in session state
             st.session_state.university = university
@@ -133,6 +182,13 @@ def page_two():
             if not user_email or "@" not in user_email or "." not in user_email:
                 st.error("Please enter a valid email address.")
                 return
+            
+            # Update user profile in MongoDB
+            update_user_data({
+                'name': user_name,
+                'email': user_email,
+                'status': 'details_completed'
+            })
             
             # Store values in session state
             st.session_state.user_name = user_name
@@ -225,9 +281,38 @@ def page_three():
         key="file_uploader"
     )
     
-    # Save the uploaded file to session state
+    # Handle file changes
     if uploaded_file is not None:
-        st.session_state.uploaded_file = uploaded_file
+        if st.session_state.uploaded_file != uploaded_file:
+            st.session_state.uploaded_file = uploaded_file
+            # Process the file directly in memory
+            try:
+                results = resume_rag_main(
+                    pdf_file=uploaded_file,
+                    target_candidate_name=st.session_state.user_name,  # Optional: use user's name if available
+                    force_recreate=False
+                )
+                if results and results.get('resume_rag') and results.get('candidate'):
+                    st.session_state.rag_system = results['resume_rag']
+                    st.session_state.candidate_map = {results['candidate'].get('name', 'unknown'): results['candidate']}
+                    st.session_state.rag_results = results['results']  # Store the query results if you want to display them
+                    st.success("File processed and analyzed successfully!")
+                else:
+                    st.error("Failed to process the file. Please try again.")
+                    st.session_state.uploaded_file = None
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+                st.session_state.uploaded_file = None
+    else:
+        if st.session_state.uploaded_file is not None:
+            st.session_state.uploaded_file = None
+            st.session_state.rag_system = None
+            st.session_state.candidate_map = None
+            # Update database to remove file reference
+            update_user_data({
+                'file_name': None,
+                'status': 'file_removed'
+            })
     
     # Check if form is complete
     is_form_complete = len(current_selection) > 0 and uploaded_file is not None
@@ -254,9 +339,13 @@ def page_three():
         if submit_button and is_form_complete:
             st.session_state.selected_professors = current_selection
             st.session_state.submission_success = True
-            if uploaded_file:
-                # Process file contents if needed
-                print("Form Submitted!")  # Console log for verification
+            
+            # Update user data in MongoDB
+            update_user_data({
+                'professors': current_selection,
+                'file_name': uploaded_file.name if uploaded_file else None,
+                'status': 'submitted'
+            })
     
     # Close the form container
     st.markdown('</div>', unsafe_allow_html=True)
@@ -276,6 +365,13 @@ def page_three():
             st.markdown('<div class="info-message">📄 Please upload a file to continue.</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
+    if 'rag_results' in st.session_state and st.session_state.rag_results:
+        st.subheader("Resume Analysis Results")
+        for res in st.session_state.rag_results:
+            st.markdown(f"**Q:** {res['query']}")
+            st.markdown(f"**A:** {res['answer']}")
+            st.markdown("---")
+
 # Page Router
 if st.session_state.page == 1:
     page_one()
@@ -283,3 +379,11 @@ elif st.session_state.page == 2:
     page_two()
 else:
     page_three()
+
+# Ensure database connection is closed when the app exits
+def cleanup():
+    db.close_connection()
+
+# Register the cleanup function
+import atexit
+atexit.register(cleanup)

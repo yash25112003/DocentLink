@@ -1,0 +1,156 @@
+{
+    "version": "v23",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "affiliation": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "title"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "markdown": {
+                    "type": "string"
+                },
+                "html": {
+                    "type": "string"
+                }
+            }
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "goal": {
+                    "type": "string"
+                },
+                "awards": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                },
+                "collaborators": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        }
+                    }
+                },
+                "recent_updates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "publications": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string"
+                            },
+                            "authors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "venue": {
+                                "type": "string"
+                            },
+                            "year": {
+                                "type": "integer"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            },
+                            "pdf": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        },
+                        "required": [
+                            "title",
+                            "authors",
+                            "venue",
+                            "year"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "interests",
+                "goal"
+            ]
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "courses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "semester": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            }
+                        },
+                        "required": [
+                            "title",
+                            "semester"
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "documentation": "This schema (v23) extends v22 by adding more detailed structures for the 'research' and 'teaching' sections.  The 'research' section now includes separate arrays for awards and collaborators, each represented as an array of objects with 'name' and optional 'url' fields.  The 'recent_updates' field remains as an array of strings. The 'publications' array now includes 'venue' and separates 'url' and 'pdf' fields. The 'teaching' section's 'courses' array now includes a 'semester' field and removes the unnecessary 'required' fields. All other fields remain consistent with v22. Data types are chosen to accurately reflect the input data. URL validation is applied where appropriate using the 'format: url' keyword."
+}
