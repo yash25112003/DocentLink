@@ -1,0 +1,11 @@
+{
+  "name": "Professor Charles Babbage",
+  "university": "Cambridge Institute of Computation",
+  "department": "Mechanical Engineering & Computation",
+  "research_interests": [
+    "Difference Engine",
+    "Automated Computation",
+    "Mechanical Calculators"
+  ],
+  "contact": "cbabbage@cam.cic.edu"
+}

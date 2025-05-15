@@ -132,4 +132,3 @@
         }
     }
 }
-make the fallback like if browser use isnt able to extract contnet then fallback to playwright model in the scrappermanaging.py

@@ -1,0 +1,21 @@
+{
+  "name": "Dr. Ada Lovelace",
+  "university": "University of Analytics",
+  "department": "Computer Science",
+  "research_interests": [
+    "Analytical Engines",
+    "Computational Theory",
+    "Symbolic AI"
+  ],
+  "recent_publications": [
+    {
+      "title": "Notes on the Analytical Engine",
+      "year": 1843
+    },
+    {
+      "title": "Future of Computing Machines",
+      "year": 1840
+    }
+  ],
+  "email": "ada.lovelace@uanalytics.edu"
+}
