@@ -64,7 +64,7 @@ class ContentExtractor:
         # If no sections found with patterns, try heading-based parsing
         if not sections:
         # Split the markdown into lines
-        lines = markdown_text.split('\n')
+            lines = markdown_text.split('\n')
         
         for line in lines:
             # Check for headings (both ATX and Setext styles)

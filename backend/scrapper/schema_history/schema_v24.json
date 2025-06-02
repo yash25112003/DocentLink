@@ -1,0 +1,113 @@
+{
+    "version": "v24",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "interests"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "link": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    },
+                    "pdf": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "teaching": {
+            "type": "string"
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema (v24) extends v23 by adding fields for 'biography' (string), restructuring the 'research' section to only include 'interests', adding an 'affiliations' section as an array of objects with 'name', 'role', and 'url', and including a 'date' field in the 'publications' object. The 'teaching' section is simplified to a string. The 'education' section now includes a 'year' field.  The 'publications' section now includes a 'pdf' field for the publication's PDF link. Data types are chosen to accurately reflect the input data. URL and date validation are applied where appropriate using the 'format: url' and 'format: date' keywords."
+}

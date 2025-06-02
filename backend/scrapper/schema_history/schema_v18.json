@@ -1,0 +1,102 @@
+{
+  "type": "object",
+  "properties": {
+    "biography": {
+      "type": "string",
+      "description": "A biographical description of the academic."
+    },
+    "research": {
+      "type": "string",
+      "description": "A description of the academic's research interests and activities."
+    },
+    "publications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the publication."
+          },
+          "link": {
+            "type": "string",
+            "format": "url",
+            "description": "URL or link to the publication."
+          },
+          "venue": {
+            "type": "string",
+            "description": "Conference, journal, or other venue where the publication appeared."
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Publication date."
+          },
+          "abstract": {
+            "type": "string",
+            "description": "Abstract or summary of the publication (optional)."
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "description": "List of publications."
+    },
+    "teaching": {
+      "type": "string",
+      "description": "Information about the academic's teaching experience and responsibilities."
+    },
+    "affiliations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the institution."
+          },
+          "role": {
+            "type": "string",
+            "description": "Role at the institution (e.g., Professor, Researcher)."
+          },
+          "url": {
+            "type": "string",
+            "format": "url",
+            "description": "URL of the institution."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "description": "List of affiliations."
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "degree": {
+            "type": "string",
+            "description": "Degree earned (e.g., PhD, MS)."
+          },
+          "institution": {
+            "type": "string",
+            "description": "Name of the institution."
+          },
+          "year": {
+            "type": "integer",
+            "description": "Year of graduation."
+          }
+        },
+        "required": [
+          "degree",
+          "institution"
+        ]
+      },
+      "description": "List of educational degrees."
+    }
+  },
+  "additionalProperties": false
+}

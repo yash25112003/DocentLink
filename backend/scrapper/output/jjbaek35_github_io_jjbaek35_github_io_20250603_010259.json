@@ -1,0 +1,81 @@
+{
+    "metadata": {
+        "source_url": "https://jjbaek35.github.io",
+        "timestamp": "2025-06-03T01:02:59.618118",
+        "scraping_tool_used": "browser-use",
+        "schema_version": "v24",
+        "status": "success"
+    },
+    "schema_documentation": "This schema (v24) extends v23 by adding fields for 'biography' (string), restructuring the 'research' section to only include 'interests', adding an 'affiliations' section as an array of objects with 'name', 'role', and 'url', and including a 'date' field in the 'publications' object. The 'teaching' section is simplified to a string. The 'education' section now includes a 'year' field.  The 'publications' section now includes a 'pdf' field for the publication's PDF link. Data types are chosen to accurately reflect the input data. URL and date validation are applied where appropriate using the 'format: url' and 'format: date' keywords.",
+    "quality_control": {
+        "completeness_score": 0.86,
+        "missing_required_fields": [
+            "personal_info"
+        ],
+        "potential_duplicates": {},
+        "academic_content_quality": {
+            "missing_sections": [],
+            "incomplete_sections": [
+                "research"
+            ],
+            "format_issues": [
+                "Publication missing title or authors: {'title': 'publications/jaejong-dsn23.pdf', 'link': 'https://dsn2023.dei.uc.pt/', 'venue': 'IEEE IFIP DSN 2023', 'date': '2023-06-27', 'abstract': \"This paper presents novel privacy attacks against LTE using machine learning to identify patterns in the communication between the UEs and eNBs without breaking into users' devices and the base station.\"}"
+            ],
+            "suggestions": [
+                "Publication missing year: publications/jaejong-dsn23.pdf",
+                "Education entry missing year: Ph.D."
+            ]
+        },
+        "notes": [
+            "Format issues found in 1 entries.",
+            "Suggestions for improvement: 2 items."
+        ]
+    },
+    "profile_data": {
+        "personal_info": null,
+        "biography": "I don't aim to be the outstanding instructor or researcher—but I do hope to be an educator who prepares with care and teaches with the conviction that I should always be useful to someone, in some way. ☕ After a whirlwind semester teaching four sections with around 700 undergrads and over 100 grad students, I'm grateful to say I made it through! I also wrapped up six master's thesis defenses and two honors thesis reviews. It kind of feels like finishing a marathon. Now it's time for a short break—then back to prepping for the fall semester.",
+        "research": {
+            "interests": [
+                "mobile and wireless network security",
+                "Telco (5G)",
+                "Access Control",
+                "Blockchain",
+                "Digital Forensics"
+            ]
+        },
+        "publications": [
+            {
+                "title": "publications/jaejong-dsn23.pdf",
+                "link": "https://dsn2023.dei.uc.pt/",
+                "venue": "IEEE IFIP DSN 2023",
+                "date": "2023-06-27",
+                "abstract": "This paper presents novel privacy attacks against LTE using machine learning to identify patterns in the communication between the UEs and eNBs without breaking into users' devices and the base station."
+            }
+        ],
+        "teaching": "Teaching Professor at Arizona State University, School of Computing and Augmented Intelligence SCAI and the SEFCOM lab. I received my Ph.D. from Yonsei University in South Korea. My research interests lie in mobile and wireless network security issues like Telco (5G), Access Control, Blockchain, and Digital Forensics. I don't aim to be the outstanding instructor or researcher—but I do hope to be an educator who prepares with care and teaches with the conviction that I should always be useful to someone, in some way. ☕ After a whirlwind semester teaching four sections with around 700 undergrads and over 100 grad students, I'm grateful to say I made it through! I also wrapped up six master's thesis defenses and two honors thesis reviews. It kind of feels like finishing a marathon. Now it's time for a short break—then back to prepping for the fall semester.",
+        "affiliations": [
+            {
+                "name": "Arizona State University",
+                "role": "Teaching Professor",
+                "url": "https://www.asu.edu/"
+            },
+            {
+                "name": "School of Computing and Augmented Intelligence (SCAI)",
+                "role": null,
+                "url": "https://scai.engineering.asu.edu/"
+            },
+            {
+                "name": "SEFCOM lab",
+                "role": null,
+                "url": "https://sefcom.asu.edu/"
+            }
+        ],
+        "education": [
+            {
+                "degree": "Ph.D.",
+                "institution": "Yonsei University",
+                "year": null
+            }
+        ]
+    }
+}
