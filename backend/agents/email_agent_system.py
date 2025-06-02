@@ -1,62 +1,107 @@
 import os
 import json
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 import logging
-from google.adk.agents import Agent # Assuming this is the correct import path
-from google.adk.models.lite_llm import LiteLlm # Assuming this is the correct import path
-from google.adk.sessions import InMemorySessionService # Assuming this is the correct import path
-from google.adk.runners import Runner # Assuming this is the correct import path
-from google.adk.tools.base_tool import BaseTool # Assuming this is the correct import path
-from google.adk.tools.tool_context import ToolContext # Assuming this is the correct import path
-# from google.genai import types # This import was present but not used, can be removed if not needed elsewhere
-from pymongo import MongoClient
+import time
 import re
 import asyncio
-from google.genai.types import UserContent
+import google.generativeai as genai
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+from google.adk.agents import Agent
+from google.adk.sessions import InMemorySessionService
+from google.adk.runners import Runner
+from google.adk.tools.base_tool import BaseTool
+from google.adk.tools.tool_context import ToolContext
+from pymongo import MongoClient
+from google.genai.types import UserContent, GenerationConfig
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Model constants
-MODEL_GEMINI_2_0_FLASH = "gemini-2.0-flash" # Make sure this model name is valid for LiteLlm
+# Configure Gemini
+try:
+    if not os.getenv("GOOGLE_API_KEY"):
+        raise ValueError("GOOGLE_API_KEY not found in environment variables.")
+    genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+    logger.info("Gemini API configured successfully.")
+except Exception as e:
+    logger.error(f"Failed to configure Gemini API: {e}", exc_info=True)
 
-__all__ = ['EmailAgentSystem']
+# Model constants
+MODEL_NAME = "gemini-1.5-flash"
+LLM_MAX_RETRIES = 3
+LLM_RETRY_DELAY = 1
+LLM_TEMPERATURE = 0.7
+
+def _call_gemini_api(prompt: str, retries: int = LLM_MAX_RETRIES, delay: int = LLM_RETRY_DELAY) -> Optional[str]:
+    """Calls the Gemini API with retry logic."""
+    if not os.getenv("GOOGLE_API_KEY"):
+        logger.error("Cannot call Gemini API: API key not configured.")
+        return None
+
+    for attempt in range(retries):
+        try:
+            model = genai.GenerativeModel(MODEL_NAME)
+            response = model.generate_content(
+                prompt,
+                generation_config=GenerationConfig(
+                    temperature=LLM_TEMPERATURE
+                )
+            )
+            if response and hasattr(response, 'text'):
+                return response.text.strip()
+            else:
+                logger.warning(f"Gemini API returned unexpected response structure on attempt {attempt + 1}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Gemini API error on attempt {attempt + 1}/{retries}: {e}", exc_info=True)
+            if attempt < retries - 1:
+                logger.info(f"Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                logger.error("Gemini API call failed after multiple retries.")
+                return None
+    return None
 
 class UserDataTool(BaseTool):
     def __init__(self, fetch_function):
         super().__init__(
             name="fetch_user_data",
-            description="Fetch user data from the database given a user_id. Input must be a dictionary with 'user_id'."
+            description="Fetch user data from the database. Requires 'user_id' parameter."
         )
         self._fetch_function = fetch_function
 
     async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
         user_id = args.get('user_id')
         if not user_id:
-            return {"error": "user_id is required for fetch_user_data"}
+            return {"error": "user_id is required"}
         return await self._fetch_function(user_id)
 
 class ProfessorDataTool(BaseTool):
     def __init__(self, fetch_function):
         super().__init__(
             name="fetch_professor_data",
-            description="Fetch professor data from the database given a professor_name. Input must be a dictionary with 'professor_name'."
+            description="Fetch professor data from files. Requires 'professor_name' parameter."
         )
         self._fetch_function = fetch_function
 
     async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
         professor_name = args.get('professor_name')
         if not professor_name:
-            return {"error": "professor_name is required for fetch_professor_data"}
+            return {"error": "professor_name is required"}
         return await self._fetch_function(professor_name)
 
 class EmailGeneratorTool(BaseTool):
     def __init__(self, generate_function):
         super().__init__(
             name="generate_email",
-            description="Generate a personalized email using user_data and professor_data. Input must be a dictionary with 'user_data' and 'professor_data'."
+            description="Generate an email using provided user and professor data. Requires 'user_data' and 'professor_data' parameters."
         )
         self._generate_function = generate_function
 
@@ -64,22 +109,20 @@ class EmailGeneratorTool(BaseTool):
         user_data = args.get('user_data')
         professor_data = args.get('professor_data')
         if not user_data or not professor_data:
-            return {"error": "user_data and professor_data are required for generate_email"}
+            return {"error": "Both user_data and professor_data are required"}
         return await self._generate_function(user_data, professor_data)
 
 class EmailAgentSystem:
     def __init__(self, session_state: Dict, session_service=None):
-        """Initialize the email agent system with session state."""
+        """Initialize the email agent system."""
         self.session_state = session_state
         self.db_client = None
-        # Ensure MONGODB_URI is set as an environment variable
         mongodb_uri = os.getenv("MONGODB_URI")
         if not mongodb_uri:
             logger.error("MONGODB_URI environment variable not set.")
             raise ValueError("MONGODB_URI environment variable not set.")
         self.db_client = MongoClient(mongodb_uri)
 
-        self.model = LiteLlm(model=MODEL_GEMINI_2_0_FLASH)
         self.session_service = session_service or InMemorySessionService()
         self._setup_tools()
         self._initialize_agents()
@@ -101,105 +144,167 @@ class EmailAgentSystem:
         # First initialize the specialized agents
         self.database_agent = Agent(
             name="database_agent",
-            model=self.model,
+            model=MODEL_NAME,
             description="Database operations specialist that handles user and professor data retrieval.",
-            instruction="You are a database assistant. You fetch user and professor data when requested.",
+            instruction="""You are a database assistant. Your primary role is to fetch data using the tools provided.
+            When you receive a request:
+            1. If it mentions a user_id, use fetch_user_data with that id
+            2. If it mentions a professor name, use fetch_professor_data with that name
+            3. If you get both pieces of data, pass them to generate_email
+            4. Only transfer to another agent if you've tried using your tools first
+            """,
             tools=[self.user_data_tool, self.professor_data_tool],
-            before_model_callback=lambda **kwargs: self._before_model_callback(**kwargs),
+            before_model_callback=self._before_model_callback,
             before_tool_callback=self._before_tool_callback
         )
 
         self.professor_agent = Agent(
             name="professor_agent",
-            model=self.model,
+            model=MODEL_NAME,
             description="Professor data specialist that handles professor profile information.",
-            instruction="You are a professor data assistant. You fetch professor data when requested.",
+            instruction="""You are a professor data assistant. Your primary role is to process professor information.
+            When you receive a request:
+            1. Use fetch_professor_data with the professor's name to get their information
+            2. Only transfer to another agent if you've tried using your tools first
+            """,
             tools=[self.professor_data_tool],
-            before_model_callback=lambda **kwargs: self._before_model_callback(**kwargs),
+            before_model_callback=self._before_model_callback,
             before_tool_callback=self._before_tool_callback
         )
 
         self.llm_agent = Agent(
             name="llm_agent",
-            model=self.model,
+            model=MODEL_NAME,
             description="Email generation specialist that creates personalized academic emails.",
-            instruction="You are an email generation assistant. You create personalized emails based on user and professor data.",
+            instruction="""You are an email generation assistant. Your primary role is to create personalized emails.
+            When you receive a request:
+            1. Check if you have both user_data and professor_data
+            2. If you have both, use generate_email to create the email
+            3. If you're missing data, transfer to database_agent to fetch it
+            """,
             tools=[self.email_generator_tool],
-            before_model_callback=lambda **kwargs: self._before_model_callback(**kwargs),
+            before_model_callback=self._before_model_callback,
             before_tool_callback=self._before_tool_callback
         )
 
-        # Then initialize the root agent that coordinates the sub-agents
-        root_instruction = (
-            "You are the main coordinator for generating personalized academic emails. "
-            "Your primary responsibility is to orchestrate the email generation process. "
-            "You have specialized sub-agents: "
-            "1. 'database_agent': Handles fetching user and professor data. "
-            "2. 'professor_agent': Handles professor profile information. "
-            "3. 'llm_agent': Handles the actual email generation. "
-            "Follow these steps: "
-            "1. Use the 'fetch_user_data' tool to get the user's profile using the provided user_id. "
-            "2. Use the 'fetch_professor_data' tool to get the professor's profile using the professor_name. "
-            "3. Use the 'generate_email' tool with the fetched user_data and professor_data to create the email. "
-            "4. Return the generated email content (subject and body). "
-            "Ensure you pass the correct arguments to each tool as per their descriptions."
-        )
+        # Root agent coordinates the process
+        root_instruction = """You are the main coordinator for generating personalized academic emails.
+        When generating an email, follow these steps in order:
+        1. Use fetch_user_data with the user_id to get their profile
+        2. Use fetch_professor_data with the professor name to get their information
+        3. Once you have both pieces of data, use generate_email to create the email
+        4. Return the generated email content with subject and body
+
+        Do not transfer to other agents unless you've tried using the appropriate tools first.
+        """
 
         self.root_agent = Agent(
             name="root_agent",
-            model=self.model,
+            model=MODEL_NAME,
             description="Main coordinator for the email generation system.",
             instruction=root_instruction,
-            tools=self.tools,  # Root agent needs access to all tools for orchestration
+            tools=self.tools,
             sub_agents=[self.database_agent, self.professor_agent, self.llm_agent],
-            before_model_callback=lambda **kwargs: self._before_model_callback(**kwargs),
+            before_model_callback=self._before_model_callback,
             before_tool_callback=self._before_tool_callback
         )
 
-    def _before_model_callback(self, **kwargs) -> Optional[str]:
-        agent = kwargs.get("agent")
-        prompt = kwargs.get("prompt")
-        # Optionally: callback_context = kwargs.get("callback_context")
-        # Optionally: llm_request = kwargs.get("llm_request")
-        if agent is None or prompt is None:
-            logger.error("_before_model_callback called without required 'agent' or 'prompt'. Got: %s", kwargs)
+    # Updated signature to accept explicitly passed arguments from the lambda
+    def _before_model_callback(self, callback_context=None, llm_request=None, **kwargs) -> Optional[str]:
+        """Pre-LLM call safety check."""
+        # Safely extract agent from callback_context or kwargs
+        agent = None
+        if callback_context and hasattr(callback_context, 'agent'):
+            agent = callback_context.agent
+        elif 'agent' in kwargs:
+            agent = kwargs['agent']
+
+        # Even if agent is None, we should still perform basic checks on the request
+        if llm_request is None:
+            logger.error(f"_before_model_callback: 'llm_request' not found")
             return None
+
+        # Extract text from LLM request contents
+        prompt_text_parts = []
+        if hasattr(llm_request, 'contents'):
+            for content in llm_request.contents:
+                if hasattr(content, 'parts'):
+                    for part in content.parts:
+                        if hasattr(part, 'text'):
+                            prompt_text_parts.append(part.text)
+
+        # Include system instruction if present
+        if hasattr(llm_request, 'config') and hasattr(llm_request.config, 'system_instruction'):
+            if isinstance(llm_request.config.system_instruction, str):
+                prompt_text_parts.append(llm_request.config.system_instruction)
+            elif hasattr(llm_request.config.system_instruction, 'text'):
+                prompt_text_parts.append(llm_request.config.system_instruction.text)
+
+        full_prompt = " ".join(prompt_text_parts).strip().lower()
+        
+        if not full_prompt:
+            logger.warning(f"Empty prompt text for agent {agent.name if agent else 'unknown'}")
+            return None
+
+        # Skip PII checks for known email-related prompts
+        if any(term in full_prompt for term in ["generate_email", "user profile", "fetch_user_data", "fetch_professor_data"]):
+            return None
+
+        # Check for sensitive information patterns
         sensitive_patterns = [
-            r'\b\d{16}\b',
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
+            r'\b\d{16}\b',  # Credit card numbers
+            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',  # Email addresses
+            r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'  # Phone numbers
         ]
         
-        if "generate_email" not in prompt.lower() and "user profile" not in prompt.lower():
-            for pattern in sensitive_patterns:
-                if re.search(pattern, prompt):
-                    logger.warning(f"Sensitive information detected in prompt for {agent.name}")
-        
+        for pattern in sensitive_patterns:
+            if re.search(pattern, full_prompt):
+                logger.warning(f"Sensitive pattern detected in prompt for {agent.name if agent else 'unknown'}")
+                return "Error: Sensitive information detected in prompt"
+
+        # Block strictly inappropriate content
         strict_inappropriate_keywords = ["password", "secret_key_do_not_reveal"]
-        if any(keyword in prompt.lower() for keyword in strict_inappropriate_keywords):
-            logger.warning(f"Highly inappropriate content detected in prompt for {agent.name}")
-            return "Error: Inappropriate content detected in the prompt."
+        if any(keyword in full_prompt for keyword in strict_inappropriate_keywords):
+            logger.error(f"Inappropriate content detected in prompt for {agent.name if agent else 'unknown'}")
+            return "Error: Inappropriate content detected"
 
         return None
 
-    async def _before_tool_callback(self, agent: Agent, tool_name: str, tool_args: Dict) -> Optional[Dict]:
+    # Updated signature to accept all ADK-provided arguments, including 'tool_obj' and 'callback_context_obj'
+    async def _before_tool_callback(self, **kwargs) -> Optional[Dict]:
         """Safety guardrail for tool arguments."""
+        # Extract all possible parameters from kwargs
+        callback_context = kwargs.get('callback_context')
+        agent = None
+        tool_name = kwargs.get('tool_name')
+        tool_args = kwargs.get('tool_args', {})
+        
+        # Try to get agent from different possible sources
+        if callback_context and hasattr(callback_context, 'agent'):
+            agent = callback_context.agent
+        elif 'agent' in kwargs:
+            agent = kwargs.get('agent')
+        
+        # Even without an agent, we can still validate the tool args
+        logger.debug(f"Before tool callback: Tool='{tool_name}', Args='{tool_args}'")
+
         if tool_name == "fetch_user_data":
             if not tool_args.get("user_id"):
-                logger.error(f"Missing user_id for {tool_name} by {agent.name}")
+                logger.error(f"Missing user_id for {tool_name}")
                 return {"error": "Missing required user_id parameter for fetch_user_data"}
             
         elif tool_name == "fetch_professor_data":
             if not tool_args.get("professor_name"):
-                logger.error(f"Missing professor_name for {tool_name} by {agent.name}")
+                logger.error(f"Missing professor_name for {tool_name}")
                 return {"error": "Missing required professor_name parameter for fetch_professor_data"}
             
         elif tool_name == "generate_email":
             required_fields = ["user_data", "professor_data"]
             missing_fields = [field for field in required_fields if not tool_args.get(field)]
             if missing_fields:
-                logger.error(f"Missing fields for {tool_name} by {agent.name}: {missing_fields}")
+                logger.error(f"Missing fields for {tool_name}: {missing_fields}")
                 return {"error": f"Missing required fields for generate_email: {', '.join(missing_fields)}"}
+
         return None
 
     async def _fetch_user_data(self, user_id: str) -> Dict:
@@ -220,38 +325,53 @@ class EmailAgentSystem:
     async def _fetch_professor_data(self, professor_name: str) -> Dict:
         """Fetch professor data from JSON files."""
         try:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            output_dir = os.path.join(base_dir, '..', 'scrapper', 'output')
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            output_dir = os.path.join(base_dir, 'backend', 'scrapper', 'output')
             
             if not os.path.isdir(output_dir):
                 logger.error(f"Professor data directory not found: {output_dir}")
                 return {"error": f"Professor data directory not found: {output_dir}"}
 
             professor_files = [f for f in os.listdir(output_dir) if f.endswith('.json')]
-            found_data = {}
             
-            normalized_prof_name = professor_name.lower().replace(" ", "_")
+            # Normalize the professor name for comparison
+            normalized_prof_name = professor_name.lower().replace(" ", "_").replace(".", "")
+            logger.info(f"Looking for professor {professor_name} (normalized: {normalized_prof_name}) in {output_dir}")
+            logger.info(f"Available files: {professor_files}")
 
+            # Try exact match first
+            exact_match_file = None
             for file_name in professor_files:
-                normalized_file_name_part = file_name.replace('.json', '').lower()
-                if normalized_prof_name in normalized_file_name_part or \
-                   professor_name.lower() in file_name.lower():
-                    file_path = os.path.join(output_dir, file_name)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                            found_data.update(data) 
-                            logger.info(f"Loaded data for {professor_name} from {file_name}")
-                    except json.JSONDecodeError as je:
-                        logger.error(f"JSON decode error in file {file_path}: {str(je)}")
-                    except Exception as fe:
-                        logger.error(f"Error reading or processing file {file_path}: {str(fe)}")
+                normalized_file_name = file_name.lower().replace(".json", "").replace(".", "")
+                if normalized_prof_name == normalized_file_name or \
+                   normalized_prof_name in normalized_file_name:
+                    exact_match_file = file_name
+                    break
             
-            logger.debug(f"_fetch_professor_data for {professor_name}: Found type {type(found_data)}")
-            if not found_data:
-                logger.warning(f"No data found for professor: {professor_name} in {output_dir}")
-                return {"error": f"No data found for professor: {professor_name}"}
-            return found_data
+            # If no exact match, try partial match
+            if not exact_match_file:
+                for file_name in professor_files:
+                    normalized_file_name = file_name.lower().replace(".json", "").replace(".", "")
+                    name_parts = normalized_prof_name.split("_")
+                    if any(part in normalized_file_name for part in name_parts if len(part) > 2):
+                        exact_match_file = file_name
+                        break
+
+            if exact_match_file:
+                file_path = os.path.join(output_dir, exact_match_file)
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        logger.info(f"Loaded data for {professor_name} from {exact_match_file}")
+                        return data
+                except json.JSONDecodeError as je:
+                    logger.error(f"JSON decode error in file {file_path}: {str(je)}")
+                except Exception as fe:
+                    logger.error(f"Error reading or processing file {file_path}: {str(fe)}")
+            
+            logger.warning(f"No matching data found for professor: {professor_name} in {output_dir}")
+            return {"error": f"No data found for professor: {professor_name}"}
+
         except Exception as e:
             logger.error(f"Error fetching professor data for {professor_name}: {str(e)}", exc_info=True)
             return {"error": f"Error fetching professor data: {str(e)}"}
@@ -268,7 +388,7 @@ class EmailAgentSystem:
             if "error" in professor_data:
                 return {"error": f"Cannot generate email due to professor data error: {professor_data['error']}"}
 
-            logger.debug(f"_generate_email: user_data keys: {user_data.keys()}, professor_data keys: {professor_data.keys()}")
+            logger.info(f"Generating email for user {user_data.get('name', 'unknown')} to professor {professor_data.get('name', 'unknown')}")
 
             user_name = user_data.get('name', 'the student')
             user_email = user_data.get('email', '')
@@ -304,70 +424,64 @@ class EmailAgentSystem:
             3. Specific references: If possible, identify 1-2 specific areas of the professor's work (from "Professor's Details") that align with the user's interests or background (from "User Profile" or "Additional User Details").
             4. Clear connection: Briefly explain how the user's background, skills, or interests make them a good fit for research in the professor's lab/area.
             5. Personalized Subject Line: Create a subject line like "Research Internship Inquiry - [User's Key Area of Interest] - {user_name}".
-            6. Email Structure:
 
-            Subject: [Generated Personalized Subject Line]
-
-            Body:
-            Dear Professor {prof_name if prof_name != 'Professor' else '[Professor Last Name]'},
-
-            My name is {user_name}, and I am a [e.g., final-year Computer Engineering student] at {user_university}. I am writing to express my keen interest in your research, particularly in [mention specific area from professor's profile].
-
-            [Paragraph 2: Elaborate on your interest. Refer to a specific paper, project, or research theme of the professor. Connect it to your own studies, projects, or skills. For example: "I was particularly fascinated by your recent work on [specific project/paper title] because [reason related to your skills/interests from user_data like resume_analysis or projects]. My experience in [relevant skill/project from user_data] has prepared me to contribute effectively to such research."]
-
-            [Paragraph 3: Briefly state your goal, e.g., seeking a research internship for Summer 202X or during the upcoming academic year. Mention your availability if known.] I am highly motivated to contribute to cutting-edge research at your esteemed institution and gain further hands-on experience.
-
-            I have attached my resume for your review at: {user_resume_link}. I would be grateful for the opportunity to discuss how my background and enthusiasm could benefit your research endeavors.
-
-            Thank you for your time and consideration.
-
-            Sincerely,
-            {user_name}
-            {user_university}
-            {user_location if user_location != '[Your Location]' else ''}
-            {user_phone if user_phone != '[Your Phone]' else ''}
-            {user_email}
-
-            Output Format:
-            Return the email as a JSON object with two keys: "subject" and "body".
-            Ensure the body is between 300 and 350 words.
+            Output Format (Return ONLY valid JSON):
+            {{
+                "subject": "The generated subject line",
+                "body": "The full email body text"
+            }}
             """
 
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, self.model.generate_content, prompt)
+            logger.info("Calling Gemini API to generate email...")
+            model = genai.GenerativeModel(MODEL_NAME)
+            response = model.generate_content(
+                prompt,
+                generation_config={
+                    "temperature": LLM_TEMPERATURE,
+                    "candidate_count": 1,
+                    "max_output_tokens": 2048,
+                    "top_p": 0.8,
+                    "top_k": 40,
+                    "stop_sequences": None
+                }
+            )
             
-            if not response or not hasattr(response, 'text') or not response.text:
+            if not response or not hasattr(response, 'text'):
                 raise ValueError("Failed to generate email content or received empty response from LLM.")
             
+            response_text = response.text.strip()
+            logger.debug(f"Raw LLM response: {response_text[:200]}...")
+            
             try:
-                email_data_str = response.text
-                if email_data_str.strip().startswith("```json"):
-                    email_data_str = email_data_str.strip()[7:-3].strip()
-                elif email_data_str.strip().startswith("```"):
-                     email_data_str = email_data_str.strip()[3:-3].strip()
+                # Clean the response if it contains markdown code fences
+                if response_text.strip().startswith("```json"):
+                    response_text = response_text.strip()[7:-3].strip()
+                elif response_text.strip().startswith("```"):
+                    response_text = response_text.strip()[3:-3].strip()
 
-                email_data = json.loads(email_data_str)
+                email_data = json.loads(response_text)
             except json.JSONDecodeError as je:
-                logger.error(f"LLM response is not valid JSON. Error: {je}. Response text: {response.text}")
-                if "Subject:" in response.text and "Body:" in response.text:
+                logger.error(f"LLM response is not valid JSON. Error: {je}. Response text: {response_text}")
+                if "Subject:" in response_text and "Body:" in response_text:
                     logger.warning("Attempting to parse Subject/Body from non-JSON LLM response.")
-                    subject_match = re.search(r"Subject:([^\n]+)", response.text, re.IGNORECASE)
-                    body_match = re.search(r"Body:(.*)", response.text, re.DOTALL | re.IGNORECASE)
+                    subject_match = re.search(r"Subject:([^\n]+)", response_text, re.IGNORECASE)
+                    body_match = re.search(r"Body:(.*)", response_text, re.DOTALL | re.IGNORECASE)
                     if subject_match and body_match:
                         email_data = {"subject": subject_match.group(1).strip(), "body": body_match.group(1).strip()}
                     else:
-                        raise ValueError(f"LLM did not return valid JSON and fallback parsing failed. Response: {response.text}")
+                        raise ValueError(f"LLM did not return valid JSON and fallback parsing failed. Response: {response_text}")
                 else:
-                    raise ValueError(f"LLM did not return valid JSON. Response: {response.text}")
-
+                    raise ValueError(f"LLM did not return valid JSON. Response: {response_text}")
 
             if not isinstance(email_data, dict) or 'subject' not in email_data or 'body' not in email_data:
                 logger.error(f"LLM response missing 'subject' or 'body': {email_data}")
                 raise ValueError("LLM response missing 'subject' or 'body' fields.")
 
             word_count = len(email_data['body'].split())
+            logger.info(f"Generated email - Subject: {email_data['subject']}")
+            logger.info(f"Email body word count: {word_count}")
             if not (280 <= word_count <= 370):
-                logger.warning(f"Email body word count ({word_count}) outside preferred range (300-350). LLM may need prompt refinement if this is critical.")
+                logger.warning(f"Email body word count ({word_count}) outside preferred range (300-350).")
 
             return email_data
         except Exception as e:
@@ -396,79 +510,45 @@ class EmailAgentSystem:
             results = {}
             for professor_name in selected_professors:
                 try:
-                    sanitized_professor_name = re.sub(r'\W+', '_', professor_name.lower())
-                    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-                    session_id = f"session_{user_id}_{sanitized_professor_name}_{timestamp}"
-                    
-                    session_state = {
-                        "user_id": user_id,
-                        "professor_name": professor_name
-                    }
-                    self.session_service.create_session(
-                        app_name="ask_my_prof_email_generation",
-                        user_id=user_id,
-                        session_id=session_id,
-                        state=session_state
-                    )
-                    runner = Runner(
-                        agent=self.root_agent,
-                        app_name="ask_my_prof_email_generation",
-                        session_service=self.session_service
-                    )
-                    
-                    final_agent_response = None
-                    prompt_message = (
-                        f"Generate a personalized email to Professor '{professor_name}' "
-                        f"from the user associated with user_id '{user_id}'. "
-                        "Use available tools to fetch user details and professor details first, then generate the email."
-                    )
-                    new_message = UserContent(parts=[{"text": prompt_message}])
-                    
-                    logger.info(f"Running agent for user '{user_id}', professor '{professor_name}', session '{session_id}'")
-                    
-                    # Handle the generator returned by runner.run()
-                    agent_responses = runner.run(
-                        session_id=session_id,
-                        new_message=new_message,
-                        user_id=user_id
-                    )
-                    
-                    # Process all responses from the generator
-                    for agent_response in agent_responses:
-                        logger.debug(f"Agent response part for {professor_name}: {type(agent_response)}")
-                        final_agent_response = agent_response
+                    # First, fetch the required data directly
+                    user_data = await self._fetch_user_data(user_id)
+                    professor_data = await self._fetch_professor_data(professor_name)
 
-                    if final_agent_response and hasattr(final_agent_response, 'output'):
-                        email_content = final_agent_response.output
-                        if isinstance(email_content, dict) and 'subject' in email_content and 'body' in email_content:
-                            results[professor_name] = {
-                                'status': 'success',
-                                'email': email_content
-                            }
-                            logger.info(f"Successfully generated email for {professor_name}")
-                        elif isinstance(email_content, dict) and 'error' in email_content:
-                            logger.error(f"Agent returned an error for {professor_name}: {email_content['error']}")
-                            results[professor_name] = {
-                                'status': 'error',
-                                'error': f"Agent error: {email_content['error']}"
-                            }
-                        else:
-                            logger.error(f"Invalid or unexpected email content format from agent for {professor_name}: {email_content}")
-                            results[professor_name] = {
-                                'status': 'error',
-                                'error': 'Invalid email content format from agent. Output was: ' + str(email_content)[:200]
-                            }
-                    else:
-                        logger.error(f"No valid final response from agent for {professor_name}. Last part: {final_agent_response}")
+                    # Check if we got valid data
+                    if "error" in user_data:
                         results[professor_name] = {
                             'status': 'error',
-                            'error': 'No conclusive response from email generation agent'
+                            'error': f"Failed to fetch user data: {user_data['error']}"
                         }
+                        continue
+
+                    if "error" in professor_data:
+                        results[professor_name] = {
+                            'status': 'error',
+                            'error': f"Failed to fetch professor data: {professor_data['error']}"
+                        }
+                        continue
+
+                    # Now generate the email with the collected data
+                    email_result = await self._generate_email(user_data, professor_data)
+                    
+                    if "error" in email_result:
+                        results[professor_name] = {
+                            'status': 'error',
+                            'error': f"Failed to generate email: {email_result['error']}"
+                        }
+                    else:
+                        results[professor_name] = {
+                            'status': 'success',
+                            'email': email_result
+                        }
+                        logger.info(f"Successfully generated email for {professor_name}")
+
                 except Exception as e:
                     logger.error(f"Unhandled exception generating email for {professor_name}: {str(e)}", exc_info=True)
                     results[professor_name] = {
                         'status': 'error',
-                        'error': f"Outer exception: {str(e)}"
+                        'error': f"Exception: {str(e)}"
                     }
 
             return {
@@ -487,12 +567,14 @@ class EmailAgentSystem:
                 logger.info("Closing MongoDB client in EmailAgentSystem.")
                 self.db_client.close()
                 self.db_client = None
-    
+
     def close_connections(self):
+        """Close any open connections."""
         if self.db_client:
             logger.info("Explicitly closing MongoDB client.")
             self.db_client.close()
             self.db_client = None
+
 
 async def main_test():
     mock_session_state = {
@@ -524,8 +606,9 @@ async def main_test():
     else:
         logger.warning("MONGODB_URI not set. Cannot create dummy user data.")
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    scrapper_output_dir = os.path.join(base_dir, '..', 'scrapper', 'output')
+    # Fix path to match structure expected by _fetch_professor_data
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    scrapper_output_dir = os.path.join(base_dir, 'backend', 'scrapper', 'output')
     os.makedirs(scrapper_output_dir, exist_ok=True)
     
     prof1_data = {
@@ -546,14 +629,19 @@ async def main_test():
         "research_interests": ["Difference Engine", "Automated Computation", "Mechanical Calculators"],
         "contact": "cbabbage@cam.cic.edu"
     }
+    
     try:
-        with open(os.path.join(scrapper_output_dir, 'dr_ada_lovelace.json'), 'w') as f:
+        prof1_file = os.path.join(scrapper_output_dir, 'dr_ada_lovelace.json')
+        prof2_file = os.path.join(scrapper_output_dir, 'professor_charles_babbage.json')
+        
+        with open(prof1_file, 'w') as f:
             json.dump(prof1_data, f, indent=2)
-        with open(os.path.join(scrapper_output_dir, 'professor_charles_babbage.json'), 'w') as f:
+        with open(prof2_file, 'w') as f:
             json.dump(prof2_data, f, indent=2)
-        logger.info("Created dummy professor JSON files.")
+        logger.info(f"Created test professor data files in {scrapper_output_dir}")
+        logger.info(f"Files created: {os.listdir(scrapper_output_dir)}")
     except Exception as e:
-        logger.error(f"Could not create dummy professor files: {e}")
+        logger.error(f"Could not create professor data files: {e}", exc_info=True)
 
     if not os.getenv("MONGODB_URI"):
         logger.error("MONGODB_URI is not set. Aborting test.")
@@ -579,19 +667,8 @@ async def main_test():
         else:
             print(f"\nOverall Error: {results.get('error')}")
 
-    except ValueError as ve:
-        logger.error(f"Initialization error: {ve}")
     except Exception as e:
-        logger.error(f"An unexpected error occurred during main_test: {e}", exc_info=True)
+        logger.error(f"Error in main_test: {e}", exc_info=True)
     finally:
         if email_system:
             email_system.close_connections()
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main_test())
-    except RuntimeError as re_err:
-        if "cannot run current event loop" in str(re_err) and "nest_asyncio" not in str(re_err):
-            print("RuntimeError with event loop. If you are in an environment like Jupyter, "
-                  "try installing 'nest_asyncio' and adding 'import nest_asyncio; nest_asyncio.apply()' at the top.")
-        raise
