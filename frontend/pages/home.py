@@ -145,6 +145,32 @@ st.markdown("""
 .button-row .stButton > button {
     margin-top: 0; /* Override general margin for buttons in a row */
 }
+
+/* New CSS for button layout */
+.button-row {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin: 8px 0;
+    width: 100%;
+}
+.button-row > div {
+    flex: 1;
+}
+.stButton > button,
+.stDownloadButton > button {
+    width: 100% !important;
+    height: 36px !important;
+    background-color: #262730 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 4px !important;
+    margin: 0 !important;
+    padding: 0.5rem 1rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -442,73 +468,73 @@ def page_three():
                     # Use the modified content for download and sending
                     email_text_content = f"Subject: {subject}\n\n{body}"
                     
-                    # Create two columns for the buttons
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.download_button(
-                            label=f"Download Email for {prof_name}",
-                            data=email_text_content,  # This will use the modified content
-                            file_name=f"email_to_{prof_name.lower().replace(' ', '_')}.txt",
-                            mime="text/plain",
-                            key=f"download_{prof_name}"
-                        )
-                    
-                    with col2:
-                        if st.button(f"Send Email to {prof_name}", key=f"send_{prof_name}"):
-                            try:
-                                # Get professor's email from CSV
-                                csv_path = os.path.join(os.path.dirname(__file__), 
-                                    f'/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/data/prof_data/{sanitize_university_name(st.session_state.university)}.csv')
-                                
-                                prof_df = pd.read_csv(csv_path)
-                                prof_email = prof_df[prof_df['Name'] == prof_name]['email'].iloc[0]
-                                
-                                if not prof_email or pd.isna(prof_email):
-                                    st.error(f"Could not find email address for {prof_name}")
-                                    continue
-                                
-                                # Construct the email_sender.py path
-                                email_sender_path = os.path.join(
-                                    os.path.dirname(__file__),
-                                    'email_sender.py'
-                                )
-                                
-                                # Create environment variables for email_sender.py using modified content
-                                env = os.environ.copy()
-                                env.update({
-                                    'EMAIL_SUBJECT': subject,  # Using modified subject
-                                    'EMAIL_BODY': body,        # Using modified body
-                                    'SENDER_EMAIL': st.session_state.user_email,
-                                    'SENDER_PASSWORD': st.session_state.user_name,
-                                    'RECIPIENT_EMAIL': prof_email,
-                                    'RECIPIENT_NAME': prof_name
-                                })
-                                
-                                # Run email_sender.py with the environment variables
-                                with st.spinner("Sending email..."):
-                                    process = subprocess.run(
-                                        ['python3', email_sender_path],
-                                        env=env,
-                                        capture_output=True,
-                                        text=True
+                    button_container = st.container()
+                    with button_container:
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.download_button(
+                                label=f"Download Email for {prof_name}",
+                                data=email_text_content,
+                                file_name=f"email_to_{prof_name.lower().replace(' ', '_')}.txt",
+                                mime="text/plain",
+                                key=f"download_{prof_name}",
+                                use_container_width=True
+                            )
+                        with c2:
+                            if st.button(f"Send Email to {prof_name}", key=f"send_{prof_name}", use_container_width=True):
+                                try:
+                                    # Get professor's email from CSV
+                                    csv_path = os.path.join(os.path.dirname(__file__), 
+                                        f'/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/data/prof_data/{sanitize_university_name(st.session_state.university)}.csv')
+                                    
+                                    prof_df = pd.read_csv(csv_path)
+                                    prof_email = prof_df[prof_df['Name'] == prof_name]['email'].iloc[0]
+                                    
+                                    if not prof_email or pd.isna(prof_email):
+                                        st.error(f"Could not find email address for {prof_name}")
+                                        continue
+                                    
+                                    # Construct the email_sender.py path
+                                    email_sender_path = os.path.join(
+                                        os.path.dirname(__file__),
+                                        'email_sender.py'
                                     )
                                     
-                                    if process.returncode == 0:
-                                        st.success(f"Email sent successfully to {prof_name} at {prof_email}")
-                                    else:
-                                        error_msg = process.stderr or "Unknown error"
-                                        st.error(f"Failed to send email: {error_msg}")
-                                        if "authentication failed" in error_msg.lower():
-                                            st.info("""
-                                            Please ensure:
-                                            1. Your email and password are correct
-                                            2. You have enabled 'Less secure app access' in your Google Account
-                                            3. Or use an App Password if you have 2-factor authentication enabled
-                                            """)
+                                    # Create environment variables for email_sender.py using modified content
+                                    env = os.environ.copy()
+                                    env.update({
+                                        'EMAIL_SUBJECT': subject,  # Using modified subject
+                                        'EMAIL_BODY': body,        # Using modified body
+                                        'SENDER_EMAIL': st.session_state.user_email,
+                                        'SENDER_PASSWORD': st.session_state.user_name,
+                                        'RECIPIENT_EMAIL': prof_email,
+                                        'RECIPIENT_NAME': prof_name
+                                    })
+                                    
+                                    # Run email_sender.py with the environment variables
+                                    with st.spinner("Sending email..."):
+                                        process = subprocess.run(
+                                            ['python3', email_sender_path],
+                                            env=env,
+                                            capture_output=True,
+                                            text=True
+                                        )
+                                        
+                                        if process.returncode == 0:
+                                            st.success(f"Email sent successfully to {prof_name} at {prof_email}")
+                                        else:
+                                            error_msg = process.stderr or "Unknown error"
+                                            st.error(f"Failed to send email: {error_msg}")
+                                            if "authentication failed" in error_msg.lower():
+                                                st.info("""
+                                                Please ensure:
+                                                1. Your email and password are correct
+                                                2. You have enabled 'Less secure app access' in your Google Account
+                                                3. Or use an App Password if you have 2-factor authentication enabled
+                                                """)
                                 
-                            except Exception as e:
-                                st.error(f"Error preparing to send email: {str(e)}")
+                                except Exception as e:
+                                    st.error(f"Error preparing to send email: {str(e)}")
 
                 else:
                     error_msg = email_details.get('error', 'Unknown error during generation for this professor.')
