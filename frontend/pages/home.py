@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime
 import sys
 import asyncio
-import atexit # Import atexit
+import atexit
+import subprocess  # Add this import
 
 # Add the project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -238,15 +239,16 @@ def page_two():
     """User Details Page"""
     with st.form(key="page_two_form"):
         st.subheader("Step 2: User Details")
-        user_name = st.text_input(
-            "Your Name",
-            value=st.session_state.user_name,
-            placeholder="Enter your full name"
-        )
         user_email = st.text_input(
             "Your Email",
             value=st.session_state.user_email,
             placeholder="Enter your email address"
+        )
+        user_name = st.text_input(
+            "Your Password",
+            value=st.session_state.user_name,
+            placeholder="Enter your Password",
+            type="password"
         )
 
         col1, col2 = st.columns(2)
@@ -422,26 +424,96 @@ def page_three():
             with st.expander(f"Email for {prof_name}", expanded=False):
                 if email_details.get('status') == 'success' and 'email' in email_details:
                     actual_email = email_details['email']
-                    subject = actual_email.get('subject', 'N/A')
-                    body = actual_email.get('body', 'N/A')
                     
-                    st.markdown(f"**Subject:**")
-                    st.text_input("Subject", subject, key=f"subject_{prof_name}", label_visibility="collapsed")
-                    st.markdown("**Body:**")
-                    st.text_area("Body", body, height=300, key=f"email_body_{prof_name}", label_visibility="collapsed")
-                    
-                    email_text_content = f"Subject: {subject}\n\n{body}"
-                    st.download_button(
-                        label=f"Download Email for {prof_name}",
-                        data=email_text_content,
-                        file_name=f"email_to_{prof_name.lower().replace(' ', '_')}.txt",
-                        mime="text/plain",
-                        key=f"download_{prof_name}"
+                    # Use text_input and text_area with unique keys and store in variables
+                    subject = st.text_input(
+                        "Subject:", 
+                        value=actual_email.get('subject', 'N/A'), 
+                        key=f"subject_{prof_name}"
                     )
+                    
+                    body = st.text_area(
+                        "Body:", 
+                        value=actual_email.get('body', 'N/A'), 
+                        height=300, 
+                        key=f"email_body_{prof_name}"
+                    )
+                    
+                    # Use the modified content for download and sending
+                    email_text_content = f"Subject: {subject}\n\n{body}"
+                    
+                    # Create two columns for the buttons
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.download_button(
+                            label=f"Download Email for {prof_name}",
+                            data=email_text_content,  # This will use the modified content
+                            file_name=f"email_to_{prof_name.lower().replace(' ', '_')}.txt",
+                            mime="text/plain",
+                            key=f"download_{prof_name}"
+                        )
+                    
+                    with col2:
+                        if st.button(f"Send Email to {prof_name}", key=f"send_{prof_name}"):
+                            try:
+                                # Get professor's email from CSV
+                                csv_path = os.path.join(os.path.dirname(__file__), 
+                                    f'/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/data/prof_data/{sanitize_university_name(st.session_state.university)}.csv')
+                                
+                                prof_df = pd.read_csv(csv_path)
+                                prof_email = prof_df[prof_df['Name'] == prof_name]['email'].iloc[0]
+                                
+                                if not prof_email or pd.isna(prof_email):
+                                    st.error(f"Could not find email address for {prof_name}")
+                                    continue
+                                
+                                # Construct the email_sender.py path
+                                email_sender_path = os.path.join(
+                                    os.path.dirname(__file__),
+                                    'email_sender.py'
+                                )
+                                
+                                # Create environment variables for email_sender.py using modified content
+                                env = os.environ.copy()
+                                env.update({
+                                    'EMAIL_SUBJECT': subject,  # Using modified subject
+                                    'EMAIL_BODY': body,        # Using modified body
+                                    'SENDER_EMAIL': st.session_state.user_email,
+                                    'SENDER_PASSWORD': st.session_state.user_name,
+                                    'RECIPIENT_EMAIL': prof_email,
+                                    'RECIPIENT_NAME': prof_name
+                                })
+                                
+                                # Run email_sender.py with the environment variables
+                                with st.spinner("Sending email..."):
+                                    process = subprocess.run(
+                                        ['python3', email_sender_path],
+                                        env=env,
+                                        capture_output=True,
+                                        text=True
+                                    )
+                                    
+                                    if process.returncode == 0:
+                                        st.success(f"Email sent successfully to {prof_name} at {prof_email}")
+                                    else:
+                                        error_msg = process.stderr or "Unknown error"
+                                        st.error(f"Failed to send email: {error_msg}")
+                                        if "authentication failed" in error_msg.lower():
+                                            st.info("""
+                                            Please ensure:
+                                            1. Your email and password are correct
+                                            2. You have enabled 'Less secure app access' in your Google Account
+                                            3. Or use an App Password if you have 2-factor authentication enabled
+                                            """)
+                                
+                            except Exception as e:
+                                st.error(f"Error preparing to send email: {str(e)}")
+
                 else:
                     error_msg = email_details.get('error', 'Unknown error during generation for this professor.')
                     st.error(f"Could not generate email for {prof_name}. Error: {error_msg}")
-    
+
     # Informational messages if form is not complete for submission
     if not is_form_complete:
         st.markdown('<div style="margin-top: 1rem;">', unsafe_allow_html=True)
