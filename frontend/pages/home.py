@@ -25,7 +25,7 @@ backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../ba
 sys.path.append(backend_path)
 
 # Import the DatabaseManager
-from db_manager import DatabaseManager
+from db_manager import DatabaseManager # type: ignore
 
 # Initialize database manager
 db = DatabaseManager()
