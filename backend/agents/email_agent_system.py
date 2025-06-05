@@ -47,11 +47,16 @@ def _call_gemini_api(prompt: str, retries: int = LLM_MAX_RETRIES, delay: int = L
     for attempt in range(retries):
         try:
             model = genai.GenerativeModel(MODEL_NAME)
+            # Pass generation config as a dictionary instead of GenerationConfig object
             response = model.generate_content(
                 prompt,
-                generation_config=GenerationConfig(
-                    temperature=LLM_TEMPERATURE
-                )
+                generation_config={
+                    "temperature": LLM_TEMPERATURE,
+                    "candidate_count": 1,
+                    "max_output_tokens": 2048,
+                    "top_p": 0.8,
+                    "top_k": 40
+                }
             )
             if response and hasattr(response, 'text'):
                 return response.text.strip()
@@ -376,64 +381,118 @@ class EmailAgentSystem:
             logger.error(f"Error fetching professor data for {professor_name}: {str(e)}", exc_info=True)
             return {"error": f"Error fetching professor data: {str(e)}"}
 
-    async def _generate_email(self, user_data: Dict, professor_data: Dict) -> Dict:
-        """Generate personalized email using Gemini."""
+    async def _generate_email(self, user_data: dict, professor_data: dict) -> dict:
+        """
+        Generate personalized email using Gemini, prioritizing resume-extracted data
+        and including resume contact details in the signature.
+        """
         try:
             if not isinstance(user_data, dict) or not isinstance(professor_data, dict):
                 err_msg = "Invalid input: user_data and professor_data must be dictionaries."
-                logger.error(f"{err_msg} Got user_data: {type(user_data)}, professor_data: {type(professor_data)}")
+                logger.error(f"{err_msg} Got user_data: {type(user_data)}, professor_data: {type(professor_data)}") #
                 return {"error": err_msg}
             if "error" in user_data:
-                return {"error": f"Cannot generate email due to user data error: {user_data['error']}"}
+                return {"error": f"Cannot generate email due to user data error: {user_data['error']}"} #
             if "error" in professor_data:
-                return {"error": f"Cannot generate email due to professor data error: {professor_data['error']}"}
+                return {"error": f"Cannot generate email due to professor data error: {professor_data['error']}"} #
 
-            logger.info(f"Generating email for user {user_data.get('name', 'unknown')} to professor {professor_data.get('name', 'unknown')}")
+            # --- Enhanced Data Extraction from resume_analysis ---
+            resume_analysis = user_data.get('resume_analysis', {}) #
+            # Ensure raw fields are fetched, default to empty strings if not present
+            contact_details_raw = str(resume_analysis.get('contact_details_raw', ''))
+            education_summary_raw = str(resume_analysis.get('education_summary_raw', resume_analysis.get('education', '')))
 
-            user_name = user_data.get('name', 'the student')
-            user_email = user_data.get('email', '')
-            user_resume_analysis = user_data.get('resume_analysis', {})
-            user_phone = user_resume_analysis.get('contact', {}).get('phone', '[Your Phone]') if isinstance(user_resume_analysis.get('contact'),dict) else '[Your Phone]'
-            user_university = user_data.get('university', '[Your University]')
-            user_location = user_resume_analysis.get('contact', {}).get('location', '[Your Location]') if isinstance(user_resume_analysis.get('contact'),dict) else '[Your Location]'
-            user_resume_link = user_data.get('resume_link', '[Link to Your Resume]')
+            # 1. User's Name (from resume analysis)
+            user_name_from_resume = "the student"
+            name_match_rag = re.search(r"candidate's name is ([A-Za-z\s\.]+)\.", contact_details_raw, re.IGNORECASE)
+            if name_match_rag:
+                user_name_from_resume = name_match_rag.group(1).strip()
+            elif resume_analysis.get('candidate_name_from_resume') and resume_analysis['candidate_name_from_resume'] not in ["Unknown", "the student"]:
+                 user_name_from_resume = resume_analysis['candidate_name_from_resume']
+            logger.info(f"Using candidate name from resume: {user_name_from_resume}")
 
-            prof_name = professor_data.get('name', 'Professor')
+            # 2. User's University (from resume analysis)
+            user_university_from_resume = "[User's University from Resume]"
+            # More robust regex for university: looks for institution names before common delimiters
+            uni_match_rag = re.search(
+                r"^(.*?)(?:Degree:|Bachelor of|Diploma of|Expected Graduation:|CGPA:|GPA:|,?\s*(?:Mumbai|India|Maharashtra|Arizona|Stanford|Cambridge|MIT|Harvard|Berkeley|USA|UK))",
+                education_summary_raw, re.IGNORECASE | re.DOTALL
+            )
+            if uni_match_rag:
+                parsed_uni = uni_match_rag.group(1).strip()
+                # Clean up common RAG prefixes
+                if parsed_uni.lower().startswith("the candidate has the following education:"):
+                    parsed_uni = parsed_uni[len("the candidate has the following education:"):].strip()
+                if parsed_uni.lower().startswith("summarize the candidate's education"): # Another possible prefix
+                    parsed_uni = parsed_uni[len("summarize the candidate's education"):].strip()
+                if parsed_uni and len(parsed_uni) > 5 and not parsed_uni.lower().startswith("answer:"): # Basic sanity check
+                    user_university_from_resume = parsed_uni
+            elif resume_analysis.get('university_from_resume') and resume_analysis['university_from_resume'] not in ["Unknown", "[User's University from Resume]"]:
+                user_university_from_resume = resume_analysis['university_from_resume']
+            logger.info(f"Using candidate university from resume: {user_university_from_resume}")
 
+            # Extract user's email
+            user_email_from_resume = None
+            email_match_rag = re.search(r"Email:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", contact_details_raw, re.IGNORECASE)
+            if email_match_rag:
+                user_email_from_resume = email_match_rag.group(1).strip()
+            elif resume_analysis.get('email_from_resume'):
+                user_email_from_resume = resume_analysis['email_from_resume']
+            logger.info(f"Using candidate email from resume: {user_email_from_resume}")
+
+            # Extract user's phone with more robust pattern matching
+            user_phone_from_resume = None
+            phone_match_rag = re.search(r"Phone:\s*(\+?[0-9\s\-\(\)]{7,})", contact_details_raw, re.IGNORECASE)
+            if phone_match_rag:
+                user_phone_from_resume = phone_match_rag.group(1).strip()
+            elif resume_analysis.get('phone_from_resume'):
+                user_phone_from_resume = resume_analysis['phone_from_resume']
+            logger.info(f"Using candidate phone from resume: {user_phone_from_resume}")
+
+            # Prepare signature block with consistent formatting
+            signature_lines = ["Sincerely,", "", user_name_from_resume]
+            if user_email_from_resume:
+                signature_lines.append(f"Email: {user_email_from_resume}")  # Add "Email:" prefix
+            if user_phone_from_resume:
+                signature_lines.append(f"Phone: {user_phone_from_resume}")  # Add "Phone:" prefix
+            signature_block = "\n".join(signature_lines)
+
+            # Generate email prompt with explicit signature instructions
             prompt = f"""
             You are an expert academic email writer. Generate a professional and personalized academic email.
 
-            User Profile:
-            Name: {user_name}
-            Email: {user_email}
-            Phone: {user_phone}
-            University: {user_university}
-            Location: {user_location}
-            Resume: {user_resume_link}
-            Additional User Details: {json.dumps(user_data, indent=2, default=str)}
+            User Profile Information:
+            Name: {user_name_from_resume}
+            University: {user_university_from_resume or '[University not found in resume]'}
+            Email: {user_email_from_resume}
+            Phone: {user_phone_from_resume}
+            Full User Profile:
+            {json.dumps(user_data, indent=2, default=str)}
 
             Professor Profile:
-            Professor's Name (if known from data): {prof_name}
-            Professor's Details: {json.dumps(professor_data, indent=2, default=str)}
+            {json.dumps(professor_data, indent=2, default=str)}
 
-            Task: Write an email from the user to the professor expressing interest in their research and a potential research internship.
+            Task: Write an email expressing interest in research and potential internship opportunities.
 
-            Requirements:
-            1. Professional academic tone.
-            2. Word count: Approximately 300-350 words for the body.
-            3. Specific references: If possible, identify 1-2 specific areas of the professor's work (from "Professor's Details") that align with the user's interests or background (from "User Profile" or "Additional User Details").
-            4. Clear connection: Briefly explain how the user's background, skills, or interests make them a good fit for research in the professor's lab/area.
-            5. Personalized Subject Line: Create a subject line like "Research Internship Inquiry - [User's Key Area of Interest] - {user_name}".
+            Critical Instructions:
+            1. Use EXACTLY this signature block at the end (do not modify it):
+            {signature_block}
+            
+            2. Keep the email professional, focused, and approximately 300-350 words.
+            3. Reference specific areas of the professor's research that align with the student's background.
+            4. DO NOT add any additional contact information beyond what is in the signature block.
 
             Output Format (Return ONLY valid JSON):
             {{
-                "subject": "The generated subject line",
-                "body": "The full email body text"
+                "subject": "Research Internship Inquiry - [Research Area] - {user_name_from_resume}",
+                "body": "The email content here... [must end with the exact signature block provided]"
             }}
             """
 
             logger.info("Calling Gemini API to generate email...")
             model = genai.GenerativeModel(MODEL_NAME)
+            
+            # Configure generation parameters directly in generate_content
             response = model.generate_content(
                 prompt,
                 generation_config={
@@ -441,53 +500,53 @@ class EmailAgentSystem:
                     "candidate_count": 1,
                     "max_output_tokens": 2048,
                     "top_p": 0.8,
-                    "top_k": 40,
-                    "stop_sequences": None
+                    "top_k": 40
                 }
             )
-            
+
             if not response or not hasattr(response, 'text'):
                 raise ValueError("Failed to generate email content or received empty response from LLM.")
-            
-            response_text = response.text.strip()
-            logger.debug(f"Raw LLM response: {response_text[:200]}...")
-            
+
+            response_text = response.text.strip() #
+            logger.debug(f"Raw LLM response: {response_text[:300]}...")
+
             try:
                 # Clean the response if it contains markdown code fences
-                if response_text.strip().startswith("```json"):
-                    response_text = response_text.strip()[7:-3].strip()
-                elif response_text.strip().startswith("```"):
-                    response_text = response_text.strip()[3:-3].strip()
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:-3].strip() #
+                elif response_text.startswith("```"):
+                    response_text = response_text[3:-3].strip() #
 
-                email_data = json.loads(response_text)
+                email_data = json.loads(response_text) #
             except json.JSONDecodeError as je:
-                logger.error(f"LLM response is not valid JSON. Error: {je}. Response text: {response_text}")
+                logger.error(f"LLM response is not valid JSON. Error: {je}. Response text: {response_text}") #
                 if "Subject:" in response_text and "Body:" in response_text:
-                    logger.warning("Attempting to parse Subject/Body from non-JSON LLM response.")
-                    subject_match = re.search(r"Subject:([^\n]+)", response_text, re.IGNORECASE)
-                    body_match = re.search(r"Body:(.*)", response_text, re.DOTALL | re.IGNORECASE)
+                    logger.warning("Attempting to parse Subject/Body from non-JSON LLM response as a fallback.") #
+                    subject_match = re.search(r"Subject:\s*(.+)", response_text, re.IGNORECASE)
+                    # Ensure Body captures multi-line content and stops before any potential post-body text if LLM adds extra.
+                    body_match = re.search(r"Body:\s*((?:.|\n)+)", response_text, re.IGNORECASE)
                     if subject_match and body_match:
                         email_data = {"subject": subject_match.group(1).strip(), "body": body_match.group(1).strip()}
                     else:
-                        raise ValueError(f"LLM did not return valid JSON and fallback parsing failed. Response: {response_text}")
+                        raise ValueError(f"LLM did not return valid JSON and fallback parsing failed. Response: {response_text}") #
                 else:
-                    raise ValueError(f"LLM did not return valid JSON. Response: {response_text}")
+                    raise ValueError(f"LLM did not return valid JSON. Response: {response_text}") #
 
             if not isinstance(email_data, dict) or 'subject' not in email_data or 'body' not in email_data:
-                logger.error(f"LLM response missing 'subject' or 'body': {email_data}")
-                raise ValueError("LLM response missing 'subject' or 'body' fields.")
+                logger.error(f"LLM response missing 'subject' or 'body': {email_data}") #
+                raise ValueError("LLM response missing 'subject' or 'body' fields after parsing.") #
 
-            word_count = len(email_data['body'].split())
-            logger.info(f"Generated email - Subject: {email_data['subject']}")
-            logger.info(f"Email body word count: {word_count}")
-            if not (280 <= word_count <= 370):
-                logger.warning(f"Email body word count ({word_count}) outside preferred range (300-350).")
+            word_count = len(email_data['body'].split()) #
+            logger.info(f"Generated email - Subject: {email_data['subject']}") #
+            logger.info(f"Email body word count: {word_count}") #
+            if not (250 <= word_count <= 450): # Relaxed word count
+                logger.warning(f"Email body word count ({word_count}) outside typical range (300-350).") #
 
-            return email_data
+            return email_data #
         except Exception as e:
-            logger.error(f"Error generating email: {str(e)}", exc_info=True)
-            return {"error": f"Exception in email generation: {str(e)}"}
-
+            logger.error(f"Error generating email: {str(e)}", exc_info=True) #
+            return {"error": f"Exception in email generation: {str(e)}"} #
+        
     async def generate_personalized_email(self) -> Dict:
         """Generate personalized emails for selected professors."""
         try:
