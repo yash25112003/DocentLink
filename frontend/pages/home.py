@@ -8,6 +8,7 @@ import sys
 import asyncio
 import atexit
 import subprocess  # Add this import
+import re # Added for regex operations
 
 # Add the project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -178,30 +179,54 @@ st.markdown("""
 st.markdown("<div class='main-title'>AskMyProf</div>", unsafe_allow_html=True)
 
 def update_user_data_in_db(update_fields: dict):
-    """Helper function to update user data in MongoDB"""
+    """Helper function to update user data in MongoDB with improved RAG processing"""
     current_time = datetime.utcnow()
     update_fields['updated_at'] = current_time
     
-    # Process RAG results for database update
-    # ** CHANGE: Store under 'resume_analysis' key **
-    # ** Also, try to structure more closely to what backend might expect, if possible from RAG **
     if 'rag_results' in st.session_state and st.session_state.rag_results:
         processed_resume_data = {}
-        # Example: If RAG can provide structured contact info
-        contact_info = {}
+        contact_details_raw = None
         
+        # First pass to get contact details
         for res in st.session_state.rag_results:
             query = res['query'].lower().strip()
             answer = res['answer']
             
-            # This part needs careful alignment with resume_rag_main's output queries
             if 'name and contact details' in query:
+                contact_details_raw = answer
                 processed_resume_data['contact_details_raw'] = answer
-                # Hypothetical: if RAG could parse phone/location
-                # contact_info['phone'] = parsed_phone_from_answer
-                # contact_info['location'] = parsed_location_from_answer
-            elif 'technical skills' in query:
-                processed_resume_data['skills'] = answer.split(',') if isinstance(answer, str) else answer # Store as list
+                break
+                
+        # Extract email and phone from contact details if available
+        if contact_details_raw:
+            # Email extraction
+            email_match = re.search(r'Email:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', 
+                                  contact_details_raw, 
+                                  re.IGNORECASE)
+            if email_match:
+                processed_resume_data['email_from_resume'] = email_match.group(1).strip()
+            
+            # Phone extraction with improved pattern
+            phone_match = re.search(r'Phone:\s*(\+?[0-9\s\-\(\)]{7,})', 
+                                  contact_details_raw, 
+                                  re.IGNORECASE)
+            if phone_match:
+                processed_resume_data['phone_from_resume'] = phone_match.group(1).strip()
+            
+            # Name extraction
+            name_match = re.search(r"candidate's name is ([A-Za-z\s\.]+)\.", 
+                                 contact_details_raw, 
+                                 re.IGNORECASE)
+            if name_match:
+                processed_resume_data['candidate_name_from_resume'] = name_match.group(1).strip()
+        
+        # Process other RAG results
+        for res in st.session_state.rag_results:
+            query = res['query'].lower().strip()
+            answer = res['answer']
+            
+            if 'technical skills' in query:
+                processed_resume_data['skills'] = answer.split(',') if isinstance(answer, str) else answer
             elif 'work experience' in query:
                 processed_resume_data['work_experience'] = answer
             elif 'academic projects and papers' in query:
@@ -209,15 +234,12 @@ def update_user_data_in_db(update_fields: dict):
             elif 'courses and certifications' in query:
                 processed_resume_data['courses_and_certifications'] = answer
             elif 'education' in query:
-                processed_resume_data['education'] = answer
+                processed_resume_data['education_summary_raw'] = answer
             elif 'programming languages' in query:
                 processed_resume_data['programming_languages'] = answer.split(',') if isinstance(answer, str) else answer
         
-        if contact_info: # If we had structured contact info
-             processed_resume_data['contact'] = contact_info
+        update_fields['resume_analysis'] = processed_resume_data
 
-        update_fields['resume_analysis'] = processed_resume_data # ** CHANGED KEY **
-    
     db.update_user_profile(st.session_state.user_id, update_fields)
     
     # ADK session state update (if using a shared ADK session)
