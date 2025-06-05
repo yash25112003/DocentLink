@@ -1,0 +1,154 @@
+{
+    "version": "v25",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "mission_statement": {
+            "type": "string"
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "latest_news": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "url"
+                            },
+                            "date": {
+                                "type": "string",
+                                "format": "date"
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "publication",
+                                    "patent",
+                                    "grant",
+                                    "award"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "title",
+                            "description",
+                            "url",
+                            "type"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "interests",
+                "latest_news"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "courses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "position",
+                "institution",
+                "description"
+            ]
+        },
+        "awards": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema (v25) extends v24 by adding a 'mission_statement' field (string), significantly improving the 'research' section to include a nested 'latest_news' array of objects, each representing a news item with title, description, URL, date, and type (publication, patent, grant, award). The 'teaching' section is enhanced from a simple string to an object with fields for position, institution, courses (array of strings), and description.  The 'publications' and 'awards' fields are now arrays of objects to allow for future expansion of details.  The 'education' section remains largely the same, but the 'year' field is now an integer.  All fields use snake_case naming convention for clarity."
+}

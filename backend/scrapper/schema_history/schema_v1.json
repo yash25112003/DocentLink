@@ -4,35 +4,79 @@
     "biography": {
       "type": "object",
       "properties": {
-        "content": {
+        "markdown": {
           "type": "string",
-          "description": "Biographical information. May contain Markdown or HTML.  Error messages will be included if extraction failed."
+          "description": "Biography in Markdown format."
         },
-        "extractionStatus": {
+        "image": {
           "type": "string",
-          "description": "Indicates the success or failure of content extraction.  e.g., 'success', 'failed', 'partial'",
-          "enum": [
-            "success",
-            "failed",
-            "partial"
-          ]
+          "description": "URL or path to a profile image."
         },
-        "errorMessage": {
+        "missionStatement": {
           "type": "string",
-          "description": "Error message if content extraction failed."
+          "description": "Mission statement of the individual."
+        },
+        "aboutMe": {
+          "type": "string",
+          "description": "A free-form description of the individual."
+        },
+        "contact": {
+          "type": "string",
+          "description": "Contact information."
         }
       },
       "required": [
-        "content",
-        "extractionStatus"
+        "markdown"
       ]
     },
-    "researchInterests": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "description": "List of research interests."
-      }
+    "research": {
+      "type": "object",
+      "properties": {
+        "interests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of research interests."
+        },
+        "latestNews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Title of the news item."
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of the news item."
+              },
+              "url": {
+                "type": "string",
+                "description": "URL related to the news item (e.g., publication, award)."
+              },
+              "date": {
+                "type": "string",
+                "format": "date",
+                "description": "Date of the news item."
+              },
+              "type": {
+                "type": "string",
+                "description": "Type of news item (e.g., publication, award, grant)."
+              }
+            },
+            "required": [
+              "title",
+              "description"
+            ]
+          }
+        }
+      },
+      "required": [
+        "interests",
+        "latestNews"
+      ]
     },
     "publications": {
       "type": "array",
@@ -48,36 +92,57 @@
               "type": "string"
             }
           },
-          "journal": {
+          "venue": {
             "type": "string"
           },
           "year": {
             "type": "integer"
-          },
-          "volume": {
-            "type": "string"
-          },
-          "issue": {
-            "type": "string"
-          },
-          "pages": {
-            "type": "string"
-          },
-          "doi": {
-            "type": "string"
           },
           "url": {
             "type": "string"
           },
           "abstract": {
             "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of publication (e.g., journal article, conference paper, patent)"
+          },
+          "impactFactor": {
+            "type": "number",
+            "description": "Impact factor of the journal (if applicable)"
           }
         },
         "required": [
           "title",
-          "authors"
+          "venue",
+          "year"
         ]
       }
+    },
+    "teaching": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "string"
+        },
+        "institution": {
+          "type": "string"
+        },
+        "courses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "position",
+        "institution"
+      ]
     },
     "awards": {
       "type": "array",
@@ -92,47 +157,19 @@
           },
           "description": {
             "type": "string"
+          },
+          "url": {
+            "type": "string"
           }
         },
         "required": [
-          "name"
+          "name",
+          "year"
         ]
-      }
-    },
-    "education": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "degree": {
-            "type": "string"
-          },
-          "institution": {
-            "type": "string"
-          },
-          "year": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "degree",
-          "institution"
-        ]
-      }
-    },
-    "contact": {
-      "type": "object",
-      "properties": {
-        "email": {
-          "type": "string",
-          "format": "email"
-        },
-        "website": {
-          "type": "string",
-          "format": "url"
-        }
       }
     }
   },
-  "additionalProperties": true
+  "required": [
+    "biography"
+  ]
 }

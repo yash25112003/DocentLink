@@ -1,0 +1,135 @@
+{
+    "metadata": {
+        "source_url": "https://jjbaek35.github.io",
+        "timestamp": "2025-06-05T18:20:44.210238",
+        "scraping_tool_used": "browser-use",
+        "schema_version": "v25",
+        "status": "success"
+    },
+    "schema_documentation": "This schema (v25) extends v24 by adding a 'mission_statement' field (string), significantly improving the 'research' section to include a nested 'latest_news' array of objects, each representing a news item with title, description, URL, date, and type (publication, patent, grant, award). The 'teaching' section is enhanced from a simple string to an object with fields for position, institution, courses (array of strings), and description.  The 'publications' and 'awards' fields are now arrays of objects to allow for future expansion of details.  The 'education' section remains largely the same, but the 'year' field is now an integer.  All fields use snake_case naming convention for clarity.",
+    "quality_control": {
+        "completeness_score": 0.33,
+        "missing_required_fields": [
+            "personal_info"
+        ],
+        "potential_duplicates": {},
+        "academic_content_quality": {
+            "missing_sections": [
+                "publications",
+                "education"
+            ],
+            "incomplete_sections": [
+                "research"
+            ],
+            "format_issues": [],
+            "suggestions": []
+        },
+        "notes": [
+            "Low data completeness.",
+            "Missing important academic sections: publications, education"
+        ]
+    },
+    "profile_data": {
+        "personal_info": null,
+        "biography": "# Jaejong Baek\n\n## Mission Statement\n\nOn advancing my expertise in cybersecurity and undertaking critical\nchallenges,my goal is to deliver my insights and findings to the pedagogical\nand research activities so that it would tremendously help produce future\nleaders who would effectively manage our national cybersecurity issues.\n\n## About Me\n\n![](../images/jaejong.jpg)\n\nHello, I am an Assistant Teaching Professor at [Arizona State\nUniversity](https://www.asu.edu/), School of Computing and Augmented\nIntelligence [SCAI](https://scai.engineering.asu.edu/) and the\n[SEFCOM](https://sefcom.asu.edu/) lab. I received my Ph.D. from [Yonsei\nUniversity](https://www.yonsei.ac.kr/en_sc/index.jsp) in South Korea. My\nresearch interests lie in mobile and wireless network security issues like\nTelco (5G), Access Control, Blockchain, and Digital Forensics. I don't aim to\nbe the outstanding instructor or researcher—but I do hope to be an educator\nwho prepares with care and teaches with the conviction that I should always be\nuseful to someone, in some way. ☕ After a whirlwind semester teaching four\nsections with around 700 undergrads and over 100 grad students, I'm grateful\nto say I made it through! I also wrapped up six master's thesis defenses and\ntwo honors thesis reviews. It kind of feels like finishing a marathon. Now\nit's time for a short break—then back to prepping for the fall semester.\n\n📫 jaejong at asu . edu\n\n## Latest News\n\n 1. Our paper\n\n[\"It's almost like Frankenstein: Investigating the Complexities of Scientific\nCollaboration and Privilege Management within Research Computing\nInfrastructures\"](https://www.computer.org/csdl/proceedings-\narticle/sp/2025/223600c995/26hiVfWPKog)has been accepted in[46th IEEE\nSymposium on Security and Privacy (May 12-15, 2025, SAN\nFRANCISCO)](https://sp2025.ieee-security.org/). This paper examines security\nconsiderations in research computing infrastructures (RCIs) through\ninterviews with experts and stakeholders, highlighting a layered access control\napproach that challenges traditional models, as collaborative, trust-based\nsharing raises compliance concerns, and concludes with recommendations to\nenhance RCI security and flexibility.\n\n 2. Our paper\n\n[\"PendingMutent: An Authorization Framework for Preventing PendingIntent\nAttacks in Android-based Mobile Cyber-Physical Systems,\"](../papers/pending-\nmutent-satcps2025.pdf)has been accepted in[ACM Workshop on Secure and\nTrustworthy Cyber-Physical Systems (SaT-CPS\n2025)](https://sites.google.com/view/sat-cps-2025), organized in conjunction\nwith the 15th ACM Conference on Data and Application Security and Privacy\n(CODASPY 2025)\n\n 3. Our paper\n\n[\"Unveiling SDN Controller Identity through Timing Side\nChannel\"](../papers/nof2024.pdf)has been accepted in[15th International\nConference on Network of the Future (October 02-04, 2024, Castelldefels\n(Barcelona), Spain)](http://nof.dnac.org/). This paper presents a novel\napproach to fingerprinting SDN controllers using timing side channels and deep\nlearning techniques.\n\n 4. Our paper\n\n[\"Targeted Privacy Attacks by Fingerprinting Mobile Apps in LTE Radio\nLayer\"](https://sefcom.asu.edu/publications/jaejong-dsn23.pdf)has been accepted\nin[IEEE IFIP DSN 2023 (June 27-30, 2023, Porto,\nPortugal)](https://dsn2023.dei.uc.pt/). This paper presents novel privacy\nattacks against LTE using machine learning to identify patterns in the\ncommunication between the UEs and eNBs without breaking into users' devices\nand the base station.\n\n 5. Our paper\n\n[\"SpaceMediator: Leveraging Authorization Policies to Prevent Spatial and\nPrivacy Attacks in Mobile Augmented\nReality\"](https://sefcom.asu.edu/publications/jaejong-sactmat23.pdf)has been\naccepted in[SACMAT 2023 (June 7-9, Trento,\nItaly)](https://sacmat2023.fbk.eu/). We present a new approach for managing\naccess control policies in a mobile augmented reality (MAR) application based\non policy-governed MAR apps against space invasion, space affectation attacks,\nand privacy leaks.\n\n 6. Our Blockchain Patent application has been issued on Feb. 21, 2023\n\n[Systems and Methods for Blockchain-Based Automatic Key\nGeneration](https://patentcenter.uspto.gov/applications/17067426)\" by USPTO.\n(Patent # 11588631)\n\n 7. Our NSF proposal has been awarded on August 29, 2022, CICI: UCSS:\nScienceAccess: Enabling Zero-Trust Resource Access Management for Scientific\nCollaborations, which will be collaborated with TAMU-CC. from Oct. 2022 to\nSept. 2025. (\n\n[Award # 2232911,\n$591,644](https://nsf.gov/awardsearch/showAward?AWD_ID=2232911))\n\n 8. Our extended edition of the Dypoldroid paper has been accepted to\n\n[Information Systems Frontier](https://www.springer.com/journal/10796)s:\nDyPolDroid: Protecting Against Permission-Abuse Attacks in Android in August\n2022. (Impact Factor: 5.261)\n\n 9. Our paper has been accepted to\n\n[Applied Energy](https://www.journals.elsevier.com/applied-energy), titled[A\nSecure Distributed Ledger for Transactive Energy: The Electron Volt\nExchange](https://doi.org/10.1016/j.apenergy.2020.116208)in November 2020.\n(Impact Factor: 8.848)\n\n 10. Our team (Jaejong Baek, Sukwha Kyung, Gail-Joon Ahn) was recognized as\nthe Most Innovative Capability in the Blockchain Innovation Challenge hosted\nby ASURE. The title of the project is\n\n[\"Cryptographic Key Management System using a Distributed Shared\nLedger.\"](https://twitter.com/ASUREASU/status/1138645169828294656)(Patent\nissued)\n\n 11. Our paper \"\n\n[Wi Not Calling: Practical Privacy and Availability Attacks in Wi-Fi\nCalling](https://adamdoupe.com/publications/wi-not-calling-acsac2018.pdf)\"\nhas been accepted in[ACSAC '18, December 3–7, 2018, San Juan, PR,\nUSA.](https://www.acsac.org/)In this paper, we analyze the security of Wi-Fi\nCalling specifications and discover several vulnerabilities that allow an\nadversary to track the location of users and perform DoS attacks.\n",
+        "mission_statement": null,
+        "research": {
+            "interests": [
+                "mobile and wireless network security",
+                "Telco (5G)",
+                "Access Control",
+                "Blockchain",
+                "Digital Forensics"
+            ],
+            "latestNews": [
+                {
+                    "title": "It's almost like Frankenstein: Investigating the Complexities of Scientific Collaboration and Privilege Management within Research Computing Infrastructures",
+                    "description": "This paper examines security considerations in research computing infrastructures (RCIs) through interviews with experts and stakeholders, highlighting a layered access control approach that challenges traditional models, as collaborative, trust-based sharing raises compliance concerns, and concludes with recommendations to enhance RCI security and flexibility.",
+                    "url": "https://www.computer.org/csdl/proceedings-article/sp/2025/223600c995/26hiVfWPKog",
+                    "date": "2025-05-12",
+                    "type": "publication"
+                },
+                {
+                    "title": "PendingMutent: An Authorization Framework for Preventing PendingIntent Attacks in Android-based Mobile Cyber-Physical Systems",
+                    "description": "This paper has been accepted in ACM Workshop on Secure and Trustworthy Cyber-Physical Systems (SaT-CPS 2025), organized in conjunction with the 15th ACM Conference on Data and Application Security and Privacy (CODASPY 2025)",
+                    "url": "../papers/pending-mutent-satcps2025.pdf",
+                    "date": "2025",
+                    "type": "publication"
+                },
+                {
+                    "title": "Unveiling SDN Controller Identity through Timing Side Channel",
+                    "description": "This paper presents a novel approach to fingerprinting SDN controllers using timing side channels and deep learning techniques.",
+                    "url": "../papers/nof2024.pdf",
+                    "date": "2024-10-02",
+                    "type": "publication"
+                },
+                {
+                    "title": "Targeted Privacy Attacks by Fingerprinting Mobile Apps in LTE Radio Layer",
+                    "description": "This paper presents novel privacy attacks against LTE using machine learning to identify patterns in the communication between the UEs and eNBs without breaking into users' devices and the base station.",
+                    "url": "https://sefcom.asu.edu/publications/jaejong-dsn23.pdf",
+                    "date": "2023-06-27",
+                    "type": "publication"
+                },
+                {
+                    "title": "SpaceMediator: Leveraging Authorization Policies to Prevent Spatial and Privacy Attacks in Mobile Augmented Reality",
+                    "description": "We present a new approach for managing access control policies in a mobile augmented reality (MAR) application based on policy-governed MAR apps against space invasion, space affectation attacks, and privacy leaks.",
+                    "url": "https://sefcom.asu.edu/publications/jaejong-sactmat23.pdf",
+                    "date": "2023-06-07",
+                    "type": "publication"
+                },
+                {
+                    "title": "Systems and Methods for Blockchain-Based Automatic Key Generation",
+                    "description": "Our Blockchain Patent application has been issued on Feb. 21, 2023 by USPTO. (Patent # 11588631)",
+                    "url": "https://patentcenter.uspto.gov/applications/17067426",
+                    "date": "2023-02-21",
+                    "type": "patent"
+                },
+                {
+                    "title": "CICI: UCSS: ScienceAccess: Enabling Zero-Trust Resource Access Management for Scientific Collaborations",
+                    "description": "Our NSF proposal has been awarded on August 29, 2022, which will be collaborated with TAMU-CC. from Oct. 2022 to Sept. 2025. (Award # 2232911, $591,644)",
+                    "url": "https://nsf.gov/awardsearch/showAward?AWD_ID=2232911",
+                    "date": "2022-08-29",
+                    "type": "grant"
+                },
+                {
+                    "title": "DyPolDroid: Protecting Against Permission-Abuse Attacks in Android",
+                    "description": "Our extended edition of the Dypoldroid paper has been accepted to Information Systems Frontiers in August 2022. (Impact Factor: 5.261)",
+                    "url": "https://www.springer.com/journal/10796",
+                    "date": "2022-08",
+                    "type": "publication"
+                },
+                {
+                    "title": "A Secure Distributed Ledger for Transactive Energy: The Electron Volt Exchange",
+                    "description": "Our paper has been accepted to Applied Energy in November 2020. (Impact Factor: 8.848)",
+                    "url": "https://doi.org/10.1016/j.apenergy.2020.116208",
+                    "date": "2020-11",
+                    "type": "publication"
+                },
+                {
+                    "title": "Cryptographic Key Management System using a Distributed Shared Ledger",
+                    "description": "Our team (Jaejong Baek, Sukwha Kyung, Gail-Joon Ahn) was recognized as the Most Innovative Capability in the Blockchain Innovation Challenge hosted by ASURE. (Patent issued)",
+                    "url": "https://twitter.com/ASUREASU/status/1138645169828294656",
+                    "date": null,
+                    "type": "award"
+                },
+                {
+                    "title": "Wi Not Calling: Practical Privacy and Availability Attacks in Wi-Fi Calling",
+                    "description": "In this paper, we analyze the security of Wi-Fi Calling specifications and discover several vulnerabilities that allow an adversary to track the location of users and perform DoS attacks.",
+                    "url": "https://adamdoupe.com/publications/wi-not-calling-acsac2018.pdf",
+                    "date": "2018-12-03",
+                    "type": "publication"
+                }
+            ]
+        },
+        "publications": null,
+        "teaching": {
+            "position": "Assistant Teaching Professor",
+            "institution": "Arizona State University",
+            "courses": [],
+            "description": "School of Computing and Augmented Intelligence [SCAI](https://scai.engineering.asu.edu/) and the [SEFCOM](https://sefcom.asu.edu/) lab. I received my Ph.D. from [Yonsei University](https://www.yonsei.ac.kr/en_sc/index.jsp) in South Korea."
+        },
+        "awards": null,
+        "affiliations": null,
+        "education": null
+    }
+}
