@@ -99,7 +99,6 @@ class FirecrawlManager:
     def __init__(self, api_key: str):
         if not api_key:
             raise ValueError("Firecrawl API key is required.")
-        # Ensure API key is string, handle potential None from getenv more robustly
         self.api_key = str(api_key) if api_key else None
         if not self.api_key:
              raise ValueError("Firecrawl API key is invalid or missing after check.")
@@ -116,60 +115,59 @@ class FirecrawlManager:
         """
         logger.info(f"Attempting Firecrawl scrape for: {url}")
         try:
-            # Prepare parameters based on config
-            params_to_pass = {
-                'onlyMainContent': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions']['onlyMainContent'],
-                'formats': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions']['formats'],
-                'waitFor': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions']['waitFor'],
-                'maxDepth': config.FIRECRAWL_CONFIG_REFERENCE['crawlerOptions']['maxDepth']
+            # *** MODIFICATION START ***
+            # Correctly structure parameters according to Firecrawl API requirements.
+            # 'maxDepth' goes inside 'crawlerOptions'.
+            # Removed 'data' from formats as it's invalid for the scrape endpoint.
+            params = {
+                'pageOptions': {
+                    'onlyMainContent': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions'].get('onlyMainContent', True),
+                    'formats': ['markdown', 'html'], # Corrected formats list
+                    'waitFor': config.FIRECRAWL_CONFIG_REFERENCE['pageOptions'].get('waitFor')
+                },
+                'crawlerOptions': {
+                    'maxDepth': config.FIRECRAWL_CONFIG_REFERENCE['crawlerOptions'].get('maxDepth', 1)
+                }
             }
 
-            logger.debug(f"Calling Firecrawl scrape_url with URL: {url} and Params: {params_to_pass}")
+            logger.debug(f"Calling Firecrawl scrape_url with URL: {url} and correctly structured Params: {params}")
 
+            # The firecrawl-py library expects separate kwargs, so we pass them unpacked.
             scrape_result = self.app.scrape_url(
                 url=url,
-                timeout=config.FIRECRAWL_TIMEOUT,
-                **params_to_pass
+                params=params, # Pass the structured params object
+                timeout=config.FIRECRAWL_TIMEOUT
             )
+            # *** MODIFICATION END ***
 
-            # Original validation logic remains the same
-            if scrape_result and ('markdown' in scrape_result or 'html' in scrape_result or 'data' in scrape_result):
-                # Prioritize returning 'data' if available and requested/present
-                if 'data' in scrape_result and scrape_result['data']:
-                    logger.info(f"Firecrawl scrape successful (structured data found): {url}")
-                    return {'data': scrape_result['data']}
-                # Then markdown if available and requested/present
-                elif 'markdown' in scrape_result and scrape_result['markdown']:
+            if scrape_result and ('markdown' in scrape_result or 'html' in scrape_result):
+                if 'markdown' in scrape_result and scrape_result['markdown']:
                     logger.info(f"Firecrawl scrape successful (Markdown): {url}")
                     return {'markdown': scrape_result['markdown']}
-                # Then HTML if available and requested/present
                 elif 'html' in scrape_result and scrape_result['html']:
                     logger.info(f"Firecrawl scrape successful (HTML): {url}")
                     return {'html': scrape_result['html']}
                 else:
-                    # This case handles if the result dict exists but the expected keys have empty content
-                    logger.warning(f"Firecrawl scrape for {url} returned empty content for expected formats. Result keys: {list(scrape_result.keys())}")
+                    logger.warning(f"Firecrawl scrape for {url} returned empty content for expected formats.")
                     return None
             else:
                 logger.warning(f"Firecrawl scrape failed or returned unexpected format for {url}. Result: {scrape_result}")
                 return None
-        # Catch the specific HTTPError from requests library used by firecrawl-py
+                
         except req_lib.exceptions.HTTPError as e:
-            # Log the specific Firecrawl error message if available in the response
             error_details = "No specific error details in response."
             status_code = e.response.status_code if e.response is not None else "Unknown"
             if e.response is not None:
                 try:
                     error_details = e.response.json()
                 except json.JSONDecodeError:
-                    error_details = e.response.text[:500] # Log raw text if not JSON
-            logger.error(f"Firecrawl API HTTP error for {url}: Status code {status_code}. {e}. Details: {error_details}", exc_info=False) # exc_info=False to avoid redundant traceback
+                    error_details = e.response.text[:500]
+            logger.error(f"Firecrawl API HTTP error for {url}: Status code {status_code}. {e}. Details: {error_details}", exc_info=False)
             return None
         except Exception as e:
-            # Catch other potential errors during the scrape call
             logger.error(f"Firecrawl unexpected error for {url}: {e}", exc_info=True)
             return None
-
+        
 # --- BrowserUseManager (Class definition remains unchanged) ---
 class BrowserUseManager:
     """Manages scraping using browser-use via the Agent pattern."""
