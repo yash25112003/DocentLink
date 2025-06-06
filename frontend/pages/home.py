@@ -329,23 +329,25 @@ def page_two():
             st.session_state.page = 3
             st.rerun()
 
+# Initialize session state for professors
+if 'selected_professors' not in st.session_state:
+    st.session_state.selected_professors = []
+
 def page_three():
     """Professor Selection & File Upload Page"""
     st.subheader(f"Step 3: Professor & Resume for {st.session_state.university}")
     
-    # Custom styles for this page (can be moved to main CSS block if preferred)
-    st.markdown("""
-    <style>
-    .button-row { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
-    .button-row .stButton > button { width: 100%; } /* Ensure buttons in row take full width of their column */
-    .info-message { padding: 10px 15px; border-radius: 5px; margin-top: 0.5rem; background-color: #e8f0fe; border-left: 3px solid #4285f4; font-size: 0.9rem; }
-    .success-message { background-color: #e6f4ea; color: #137333; padding: 15px; border-radius: 5px; margin-top: 1rem; text-align: center; font-weight: 500; border-left: 3px solid #137333; }
-    .stMultiSelect > div > div { max-width: 100% !important; } /* Attempt to make multiselect wider */
-    </style>
-    """, unsafe_allow_html=True)
-    
+    # Load professor data with additional information
     with st.spinner("Loading professor data..."):
-        professors_list = load_professor_data(st.session_state.university)
+        professors_df = None
+        try:
+            csv_path = os.path.join(os.path.dirname(__file__), 
+                f'/Users/ShahYash/Desktop/Projects/ask-my-prof/AskMyProf/data/prof_data/{sanitize_university_name(st.session_state.university)}.csv')
+            professors_df = pd.read_csv(csv_path)
+            professors_list = professors_df['Name'].dropna().unique().tolist()
+        except Exception as e:
+            st.error(f"Error loading professor data: {e}")
+            professors_list = []
     
     if not professors_list:
         st.warning(f"No professors found for {st.session_state.university}. Please check the data source or select a different university.")
@@ -354,16 +356,29 @@ def page_three():
             st.rerun()
         return
 
-    valid_selections = [p for p in st.session_state.selected_professors if p in professors_list]
+    # Get currently selected professor names
+    current_selections = [p.get('name', p) if isinstance(p, dict) else p for p in st.session_state.selected_professors]
+    valid_selections = [p for p in current_selections if p in professors_list]
     
-    current_selection = st.multiselect(
+    # Professor selection with multiselect
+    selected_names = st.multiselect(
         "Select up to 10 professors you are interested in:",
         options=professors_list,
         max_selections=10,
         default=valid_selections,
         placeholder="Type or select professor names"
     )
-    
+
+    # Update selected_professors with full information
+    if selected_names != current_selections:
+        st.session_state.selected_professors = []
+        for name in selected_names:
+            prof_info = {
+                'name': name,
+                'about': professors_df[professors_df['Name'] == name]['About'].iloc[0] if professors_df is not None else None
+            }
+            st.session_state.selected_professors.append(prof_info)
+
     st.markdown('<hr style="margin: 1rem 0; border-color: #e0e0e0;">', unsafe_allow_html=True)
     
     st.subheader("Upload Your Resume")
@@ -419,23 +434,23 @@ def page_three():
                     st.markdown("---")
 
     # Form completion check
-    is_form_complete = len(current_selection) > 0 and st.session_state.uploaded_file_details is not None and st.session_state.rag_results is not None
+    is_form_complete = len(selected_names) > 0 and st.session_state.uploaded_file_details is not None and st.session_state.rag_results is not None
     
     st.markdown('<div class="button-row">', unsafe_allow_html=True)
     col_back, col_submit = st.columns(2)
     with col_back:
         if st.button("← Back to User Details"):
-            st.session_state.selected_professors = current_selection # Save current selection
+            st.session_state.selected_professors = selected_names # Save current selection
             st.session_state.page = 2
             st.rerun()
     with col_submit:
         submit_disabled = not is_form_complete
         if st.button("Generate Emails ✨", disabled=submit_disabled, type="primary"):
-            st.session_state.selected_professors = current_selection
+            st.session_state.selected_professors = selected_names
             
             # Final update to DB before generation
             update_user_data_in_db({
-                'professors': current_selection,
+                'professors': selected_names,
                 'status': 'submitted_for_generation'
                 # resume_analysis and file_name should already be in DB from file upload logic
             })
@@ -565,7 +580,7 @@ def page_three():
     # Informational messages if form is not complete for submission
     if not is_form_complete:
         st.markdown('<div style="margin-top: 1rem;">', unsafe_allow_html=True)
-        if not current_selection:
+        if not selected_names:
             st.markdown('<p class="info-message">📚 Please select at least one professor.</p>', unsafe_allow_html=True)
         if st.session_state.uploaded_file_details is None:
             st.markdown('<p class="info-message">📄 Please upload your resume.</p>', unsafe_allow_html=True)
