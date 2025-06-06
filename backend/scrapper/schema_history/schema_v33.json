@@ -1,0 +1,109 @@
+{
+    "version": "v33",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "office_location": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "full_name"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research_interests": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "patents": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "grants": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "awards_and_honors": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "rankings": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string"
+                },
+                "area": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                }
+            }
+        }
+    },
+    "documentation": "This schema extends v32 by adding email and phone number to personal information, adding a year field to the education section, and including a new 'rankings' section to accommodate information about university rankings in specific areas.  The 'publications', 'patents', 'grants', 'awards_and_honors', and 'affiliations' sections remain as arrays of objects to allow for future expansion and detailed information."
+}

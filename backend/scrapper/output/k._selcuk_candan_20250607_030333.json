@@ -1,0 +1,236 @@
+{
+    "metadata": {
+        "source_url": "https://kscandan.site",
+        "schema_version": "v36",
+        "timestamp": "2025-06-07T03:03:33.539673",
+        "scraping_tool_used": "playwright",
+        "status": "success"
+    },
+    "schema_documentation": "This schema is designed to accommodate a wide range of academic profile information.  It includes sections for personal information, a biography (allowing for markdown formatting), research interests, education history, publications, patents, grants, awards and honors, affiliations, and rankings.  Arrays are used to handle multiple entries within each category.  The `personal_info` object is comprehensive, and education details are in a dedicated `education` section. Email format is validated. The biography field is structured to handle markdown content.",
+    "quality_control": {
+        "completeness_score": 0.6,
+        "missing_fields": [
+            "publications",
+            "patents",
+            "grants",
+            "rankings"
+        ],
+        "notes": [
+            "Data completeness score is low. The following fields were empty or not found in the text: publications, patents, grants, rankings"
+        ]
+    },
+    "profile_data": {
+        "personal_info": {
+            "full_name": "K. Selcuk Candan",
+            "title": "Professor of Computer Science and Engineering",
+            "email": null,
+            "phone": null,
+            "office_location": null,
+            "department": "School of Computing and Augmented Intelligence (SCAI)",
+            "institution": "Arizona State University (ASU)"
+        },
+        "biography": {
+            "markdown": "K. Selçuk Candan is a professor of computer science and engineering at Arizona State University (ASU) and the director of ASU’s Center for Assured and Scalable Data Engineering (CASCADE). His primary research interest is in the area of management and analysis of non-traditional, heterogeneous, and imprecise (such as multimedia, web, and scientific) data.\nHe has published over 250 journal and peer-reviewed conference articles, one book, and 16 book chapters. He has 9 patents. Prof. Candan served as an associate editor for the Very Large Databases (VLDB) journal, IEEE Transactions on Multimedia, Journal of Multimedia, IEEE Transactions on Knowledge and Data Engineering, and IEEE Transactions on Cloud Computing. He is currently an Associate Editor for the ACM Transactions on Database Systems, Proceedings of the VLDB (PVLDB) and the Proceedings of the ACM on Management of Data (PACMMOD). He also served as a founding Managing editor for ACM PACMMOD journal.\nHe has served in the organization and program committees of various scientific conferences. In 2006, he served as an organization committee member for SIGMOD’06, the flagship database conference of the ACM. In 2008, he served as a PC Chair for another leading, flagship conference of the ACM, this time focusing on multimedia research (MM’08). More recently, he served as a program committee group leader for ACM SIGMOD’10. He also serves in the review board of the Proceedings of the VLDB Endowment (PVLDB). In 2011, he served as a general co-chair for the ACM MM’11 conference. In 2012 he served as a general co-chair for ACM SIGMOD’12. In 2015, he served as a general co-chair for the IEEE International Conference on Cloud Engineering (I2CE). In 2017, he served as a program chair for the International Conference on Database Systems for Advanced Applications (DASFAA) and in 2019, he served as a program chair for the ACM Int. Conference on Multimedia Retrieval (ICMR). In 2022 Candan served as a General co-Chair for the ACM Web Search and Data Mining  (WSDM) conference and, in 2023, he served as a Program co-Chair for ACM SIGMOD’23.\nHe has successfully served as the PI or co-PI of numerous grants, including from the National Science Foundation, Department of Energy, Air Force Office of Research, Army Research Office, Army Corps of Engineers, Mellon Foundation, and various industrial partners. He also served as a Visiting Research Scientist at NEC Laboratories America for over 10 years.\nHe served as a member of the Executive Committee of ACM SIGMOD and is an ACM Distinguished Scientist."
+        },
+        "research_interests": [
+            "management and analysis of non-traditional, heterogeneous, and imprecise data (such as multimedia, web, and scientific data)",
+            "causal learning"
+        ],
+        "education": [
+            {
+                "degree": "PhD",
+                "institution": "University of Maryland at College Park",
+                "year": 1997,
+                "major": "Computer Science"
+            },
+            {
+                "degree": "BS",
+                "institution": "Bilkent University, Turkey",
+                "year": 1993,
+                "major": "Computer Engineering and Information Sciences"
+            }
+        ],
+        "publications": [],
+        "patents": [],
+        "grants": [],
+        "awards_and_honors": [
+            {
+                "year": 2012,
+                "award": "ACM Distinguished Scientist"
+            },
+            {
+                "year": 2023,
+                "award": "ACM SIGMOD Contributions Award",
+                "description": "for extensive and outstanding service to the database community"
+            },
+            {
+                "year": 2023,
+                "award": "Dan Jankowski Legacy Award, Fulton Schools of Engineering",
+                "description": "recognizes engineering faculty with exemplary contributions in teaching, research and public service"
+            },
+            {
+                "year": 2022,
+                "award": "Top 5% Faculty Award, Fulton Schools of Engineering"
+            },
+            {
+                "year": 2021,
+                "award": "Top 5% Faculty Award, Fulton Schools of Engineering"
+            },
+            {
+                "year": 2020,
+                "award": "Fulton Engineering Best Teacher Award"
+            },
+            {
+                "year": 2018,
+                "award": "Fulton Faculty Examplar"
+            },
+            {
+                "year": 2018,
+                "award": "Top 5% Faculty Award, Fulton Schools of Engineering"
+            },
+            {
+                "year": 2015,
+                "award": "Fulton Engineering Faculty Examplar"
+            },
+            {
+                "year": 2015,
+                "award": "Fulton Engineering Best Teacher Award"
+            },
+            {
+                "year": 2014,
+                "award": "Top 5% Faculty Award, Fulton Schools of Engineering"
+            },
+            {
+                "year": 2013,
+                "award": "Fulton Engineering Best Teacher Award"
+            },
+            {
+                "year": 2012,
+                "award": "Top 5% Faculty Award, Fulton Schools of Engineering"
+            }
+        ],
+        "affiliations": [
+            {
+                "title": "Director",
+                "organization": "ASU Center for Assured and Scalable Data Engineering (CASCADE)",
+                "start_year": 2016,
+                "end_year": null
+            },
+            {
+                "title": "Assoc. Director for Cyberinfrastructure",
+                "organization": "NSF Center for Analysis and Prediction of Pandemic Expansion (APPEX)",
+                "start_year": 2024,
+                "end_year": null
+            },
+            {
+                "title": "Professor of Computer Science and Engineering",
+                "organization": "School of Computing and Augmented Intelligence (SCAI), ASU",
+                "start_year": 2009,
+                "end_year": null
+            },
+            {
+                "title": "Member of the Executive Committee",
+                "organization": "ACM SIGMOD",
+                "start_year": 2012,
+                "end_year": null
+            },
+            {
+                "title": "Member of the Steering Committee",
+                "organization": "ACM ICMR",
+                "start_year": 2018,
+                "end_year": null
+            },
+            {
+                "title": "Research Lead/Director",
+                "organization": "EmitLab, ASU",
+                "start_year": 1997,
+                "end_year": null
+            },
+            {
+                "title": "(Interim) Co- Director",
+                "organization": "School of Computing and Augmented Intelligence, ASU",
+                "start_year": 2022,
+                "end_year": 2022
+            },
+            {
+                "title": "Coordinator",
+                "organization": "Big Data Systems Concentration (MS and MCS)",
+                "start_year": 2015,
+                "end_year": null
+            },
+            {
+                "title": "Associate Director",
+                "organization": "Arts, Media, and Engineering Program, ASU",
+                "start_year": 2007,
+                "end_year": 2009
+            },
+            {
+                "title": "Associate Professor",
+                "organization": "Department of Computer Science and Engineering, ASU",
+                "start_year": 2003,
+                "end_year": 2009
+            },
+            {
+                "title": "Assistant Professor",
+                "organization": "Department of Computer Science and Engineering, ASU",
+                "start_year": 1997,
+                "end_year": 2003
+            },
+            {
+                "title": "Graduate Faculty",
+                "organization": "Computer Science PhD (endorsed to chair), ASU",
+                "start_year": 1997,
+                "end_year": null
+            },
+            {
+                "title": "Graduate Faculty",
+                "organization": "Computer Engineering PhD (endorsed to chair in both Computer Systems and Electrical Eng.), ASU",
+                "start_year": null,
+                "end_year": null
+            },
+            {
+                "title": "Graduate Faculty",
+                "organization": "Data Science, Analysis, and Engineering PhD, ASU",
+                "start_year": null,
+                "end_year": null
+            },
+            {
+                "title": "Graduate Faculty",
+                "organization": "Media Arts and Sciences PhD, ASU",
+                "start_year": null,
+                "end_year": null
+            },
+            {
+                "title": "Graduate Faculty and Scientific Board",
+                "organization": "Modeling and Data Science PhD, U. Torino",
+                "start_year": 2018,
+                "end_year": null
+            },
+            {
+                "title": "Senior Sustainability Scientist",
+                "organization": "Global Institute of Sustainability, ASU",
+                "start_year": 2010,
+                "end_year": null
+            },
+            {
+                "title": "Affilate Faculty",
+                "organization": "Center for Cybersecurity and Digital Forensics, ASU",
+                "start_year": 2018,
+                "end_year": null
+            },
+            {
+                "title": "Affilate Faculty",
+                "organization": "Center for Biodiversity Outcomes, ASU",
+                "start_year": 2015,
+                "end_year": null
+            },
+            {
+                "title": "Affilate Faculty",
+                "organization": "Center for Biodiversity Outcomes, ASU",
+                "start_year": 2015,
+                "end_year": null
+            }
+        ],
+        "rankings": []
+    }
+}

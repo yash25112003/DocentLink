@@ -1,0 +1,377 @@
+{
+    "metadata": {
+        "source_url": "https://chitta.orissalinks.com/www/",
+        "schema_version": "v36",
+        "timestamp": "2025-06-07T02:47:34.111544",
+        "scraping_tool_used": "playwright",
+        "status": "success"
+    },
+    "schema_documentation": "This schema is designed to accommodate a wide range of academic profile information.  It includes sections for personal information, a biography (allowing for markdown formatting), research interests, education history, publications, patents, grants, awards and honors, affiliations, and rankings.  Arrays are used to handle multiple entries within each category.  The `personal_info` object is comprehensive, and education details are in a dedicated `education` section. Email format is validated. The biography field is structured to handle markdown content.",
+    "quality_control": {
+        "completeness_score": 0.5,
+        "missing_fields": [
+            "patents",
+            "grants",
+            "awards_and_honors",
+            "affiliations",
+            "rankings"
+        ],
+        "notes": [
+            "Data completeness score is low. The following fields were empty or not found in the text: patents, grants, awards_and_honors, affiliations, rankings"
+        ]
+    },
+    "profile_data": {
+        "personal_info": {
+            "full_name": "Chitta Baral",
+            "title": "Professor",
+            "email": "chitta-aat-asu-period-edu",
+            "phone": "480-727-6047",
+            "office_location": "Suite 572, 699 S. Mill Avenue, Tempe, AZ 85281-8809, U.S.A.",
+            "department": "School of Computing & AI",
+            "institution": "Arizona State University"
+        },
+        "biography": {
+            "markdown": "Ph.D in Computer Science (1991), University of Maryland."
+        },
+        "research_interests": [
+            "Natural Language Understanding",
+            "Information/Text Retrieval",
+            "Knowledge Representation and Reasoning",
+            "Logic and Actions"
+        ],
+        "education": [
+            {
+                "degree": "Ph.D",
+                "institution": "University of Maryland",
+                "year": 1991,
+                "major": "Computer Science"
+            }
+        ],
+        "publications": [
+            {
+                "authors": [
+                    "Swaroop Mishra",
+                    "Daniel Khashabi",
+                    "Chitta Baral",
+                    "Hannaneh Hajishirzi"
+                ],
+                "title": "Cross-Task Generalization via Natural Language Crowdsourcing Instructions",
+                "venue": "ACL",
+                "year": 2022
+            },
+            {
+                "authors": [
+                    "Chitta Baral"
+                ],
+                "title": "Knowledge representation, reasoning and declarative problem solving",
+                "publisher": "Cambridge University Press",
+                "year": 2003
+            },
+            {
+                "authors": [
+                    "Paulo Shakarian",
+                    "Chitta Baral",
+                    "Gerardo I. Simari",
+                    "Bowen Xi",
+                    "Lahari Pokala"
+                ],
+                "title": "Neuro Symbolic Reasoning and Learning",
+                "publisher": "Springer",
+                "year": 2023
+            },
+            {
+                "authors": [
+                    "Man Luo",
+                    "Tejas Gokhale",
+                    "Neeraj Varshney",
+                    "Yezhou Yang",
+                    "Chitta Baral"
+                ],
+                "title": "Advances in Multimodal Information Retrieval and Generation",
+                "publisher": "Springer",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Divij Handa",
+                    "Pavel Dolin",
+                    "Shrinidhi Kumbhar",
+                    "Tran Cao Son",
+                    "Chitta Baral"
+                ],
+                "title": "ActionReasoningBench: Reasoning about Actions with and without Ramification Constraints",
+                "venue": "ICLR",
+                "year": 2025
+            },
+            {
+                "authors": [
+                    "Zhikun Xu",
+                    "Ming Shen",
+                    "Jacob Dineen",
+                    "Zhaonan Li",
+                    "Xiao Ye",
+                    "Shijie Lu",
+                    "Aswin RRV",
+                    "Chitta Baral",
+                    "Ben Zhou"
+                ],
+                "title": "ToW: Thoughts of Words Improve Reasoning in Large Language Models",
+                "venue": "NAACL",
+                "year": 2025
+            },
+            {
+                "authors": [
+                    "Venkatesh Mishra",
+                    "Bimsara Pathiraja",
+                    "Mihir Parmar",
+                    "Sat Chidananda",
+                    "Jayanth Srinivasa",
+                    "Gaowen Liu",
+                    "Ali Payani",
+                    "Chitta Baral"
+                ],
+                "title": "Investigating the Shortcomings of LLMs in Step-by-Step Legal Reasoning",
+                "venue": "NAACL Findings",
+                "year": 2025
+            },
+            {
+                "authors": [
+                    "Nisarg Patel",
+                    "Mohith Kulkarni",
+                    "Mihir Parmar",
+                    "Aashna Budhiraja",
+                    "Mutsumi Nakamura",
+                    "Neeraj Varshney",
+                    "Chitta Baral"
+                ],
+                "title": "Multi-LogiEval: Towards Evaluating Multi-Step Logical Reasoning Ability of Large Language Models",
+                "venue": "EMNLP",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Nemika Tyagi",
+                    "Mihir Parmar",
+                    "Mohith Kulkarni",
+                    "Aswin RRV",
+                    "Nisarg Patel",
+                    "Mutsumi Nakamura",
+                    "Arindam Mitra",
+                    "Chitta Baral"
+                ],
+                "title": "Step-by-Step Reasoning to Solve Grid Puzzles: Where do LLMs Falter?",
+                "venue": "EMNLP",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Mutsumi Nakamura",
+                    "Santosh Mashetty",
+                    "Mihir Parmar",
+                    "Neeraj Varshney",
+                    "Chitta Baral"
+                ],
+                "title": "LogicAttack: Adversarial Attacks for Evaluating Logical Consistency of Natural Language Inference",
+                "venue": "Findings of EMNLP",
+                "year": 2023
+            },
+            {
+                "authors": [
+                    "Mihir Parmar",
+                    "Nisarg Patel",
+                    "Neeraj Varshney",
+                    "Mutsumi Nakamura",
+                    "Man Luo",
+                    "Santosh Mashetty",
+                    "Arindam Mitra",
+                    "Chitta Baral"
+                ],
+                "title": "Towards Systematic Evaluation of Logical Reasoning Ability of Large Language Models",
+                "venue": "ACL",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Mihir Parmar",
+                    "Swaroop Mishra",
+                    "Mor Geva",
+                    "Chitta Baral"
+                ],
+                "title": "Don't Blame the Annotator: Bias Already Starts in the Annotation Instructions",
+                "venue": "EACL",
+                "year": 2023,
+                "award": "Outstanding paper award"
+            },
+            {
+                "authors": [
+                    "Himanshu Gupta",
+                    "Kevin Scaria",
+                    "Ujjwala Anantheswaran",
+                    "Shreyas Verma",
+                    "Mihir Parmar",
+                    "Saurabh Arjun Sawant",
+                    "Chitta Baral",
+                    "Swaroop Mishra"
+                ],
+                "title": "TarGEN: Targeted Data Generation with Large Language Models",
+                "venue": "COLM",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Aswin RRV",
+                    "Nemika Tyagi",
+                    "Md Nayem Uddin",
+                    "Neeraj Varshney",
+                    "Chitta Baral"
+                ],
+                "title": "Chaos with Keywords: Exposing Large Language Models Sycophancy to Misleading Keywords and Evaluating Defense Strategies",
+                "venue": "ACL Findings",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Neeraj Varshney",
+                    "Pavel Dolin",
+                    "Agastya Seth",
+                    "Chitta Baral"
+                ],
+                "title": "The Art of Defending: A Systematic Evaluation and Analysis of LLM Defense Strategies on Safety and Over-Defensiveness",
+                "venue": "ACL Findings",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Kevin Scaria",
+                    "Himanshu Gupta",
+                    "Siddharth Goyal",
+                    "Saurabh Arjun Sawant",
+                    "Swaroop Mishra",
+                    "Chitta Baral"
+                ],
+                "title": "InstructABSA: Instruction Learning for Aspect Based Sentiment Analysis",
+                "venue": "NAACL",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Neeraj Varshney",
+                    "Agneet Chatterjee",
+                    "Mihir Parmar",
+                    "Chitta Baral"
+                ],
+                "title": "Investigating Acceleration of LLaMA Inference by Enabling Intermediate Layer Decoding via Instruction Tuning with 'LITE'",
+                "venue": "Findings of NAACL",
+                "year": 2024
+            },
+            {
+                "authors": [
+                    "Y. Wang",
+                    "S. Mishra",
+                    "P. Alipoormolabashi",
+                    "Y. Kordi",
+                    "A. Mirzaei",
+                    "A. Naik",
+                    "A. Ashok",
+                    "A. S. Dhanasekaran",
+                    "A. Arunkumar",
+                    "D. Stap",
+                    "E. Pathak",
+                    "G. Karamanolakis",
+                    "H. Lai",
+                    "I. Purohit",
+                    "Ishan Mondal",
+                    "J. Anderson",
+                    "K. Kuznia",
+                    "K. Doshi",
+                    "K. K. Pal",
+                    "M. Patel",
+                    "M. Moradshahi",
+                    "M. Parmar",
+                    "M. Purohit",
+                    "N. Varshney",
+                    "P. R. Kaza",
+                    "P. Verma",
+                    "R. S. Puri",
+                    "R. Karia",
+                    "S. Doshi",
+                    "S. K. Sampat",
+                    "S. Mishra",
+                    "S. Reddy",
+                    "S. Patro",
+                    "T. Dixit",
+                    "X. Shen",
+                    "C. Baral",
+                    "Y. Choi",
+                    "N. A. Smith",
+                    "H. Hajishirzi",
+                    "D. Khashabi"
+                ],
+                "title": "Super-NaturalInstructions: Generalization via Declarative Instructions on 1600+ Tasks",
+                "venue": "EMNLP",
+                "year": 2022
+            },
+            {
+                "authors": [
+                    "Pruthvi Jayeshkumar Patel",
+                    "Swaroop Mishra",
+                    "Mihir Parmar",
+                    "Chitta Baral"
+                ],
+                "title": "Is a Question Decomposition Unit All We Need?",
+                "venue": "EMNLP",
+                "year": 2022
+            },
+            {
+                "authors": [
+                    "Kirby Kuznia",
+                    "Swaroop Mishra",
+                    "Mihir Parmar",
+                    "Chitta Baral"
+                ],
+                "title": "Less is More: Summary of Long Instructions is Better for Program Synthesis",
+                "venue": "EMNLP",
+                "year": 2022
+            },
+            {
+                "authors": [
+                    "Mihir Parmar",
+                    "Swaroop Mishra",
+                    "Mirali Purohit",
+                    "Man Luo",
+                    "M. Hassan Murad",
+                    "Chitta Baral"
+                ],
+                "title": "In-BoXBART: Get Instructions into Biomedical Multi-Task Learning",
+                "venue": "Findings of NAACL",
+                "year": 2022
+            },
+            {
+                "authors": [
+                    "Swaroop Mishra",
+                    "Daniel Khashabi",
+                    "Chitta Baral",
+                    "Yejin Choi",
+                    "Hannaneh Hajishirzi"
+                ],
+                "title": "Reframing Instructional Prompts to GPTk's Language",
+                "venue": "Findings of ACL",
+                "year": 2022
+            },
+            {
+                "authors": [
+                    "Kuntal Pal",
+                    "Chitta Baral"
+                ],
+                "title": "Investigating Numeracy Learning Ability of a Text-to-Text Transfer Model",
+                "venue": "Findings of EMNLP",
+                "year": 2022
+            }
+        ],
+        "patents": [],
+        "grants": [],
+        "awards_and_honors": [],
+        "affiliations": [],
+        "rankings": []
+    }
+}

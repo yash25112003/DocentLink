@@ -5,6 +5,7 @@ import json
 import os
 import asyncio
 import nest_asyncio # Handles asyncio event loop conflicts in some environments
+import re # Using re for sanitizing filename
 from datetime import datetime
 from typing import Dict
 
@@ -13,24 +14,44 @@ nest_asyncio.apply()
 
 # Project Modules
 import config
-from scraping_manager import ScrapeOrchestrator, ContentValidator
-from processing import ContentProcessor
-from llm_handler import SchemaGenerator
+from scraping_manager import ScrapeOrchestrator
+# The following imports are available but not directly used in this modified main.py
+# as their logic is encapsulated within the ScrapeOrchestrator
+# from processing import ContentProcessor
+# from llm_handler import SchemaGenerator
+# from scraping_manager import ContentValidator
+
 
 # Setup logger for this module
 logger = logging.getLogger(__name__)
 
 # --- Output Formatting ---
 def save_output(data: Dict, output_dir: str, url: str, format: str = "json"):
-    """Saves the final data to a file."""
-    # Create a filename based on URL (simplified)
+    """Saves the final data to a file, naming it after the professor if possible."""
+    filename = ""
     try:
-        domain = url.split('/')[2].replace('.', '_')
-        path_part = url.split('/')[-1] or url.split('/')[-2] # Get last part of path
-        safe_path = "".join(c if c.isalnum() else "_" for c in path_part)[:50] # Sanitize
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{domain}_{safe_path}_{timestamp}.{format}"
-    except Exception:
+        # Attempt to create a filename from the professor's name
+        professor_name = data.get("profile_data", {}).get("personal_info", {}).get("full_name")
+        if professor_name and isinstance(professor_name, str) and professor_name.strip():
+            # Sanitize the name to be filesystem-friendly
+            sane_name = professor_name.strip().lower().replace(" ", "_")
+            sane_name = re.sub(r'(?u)[^-\w.]', '', sane_name)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{sane_name}_{timestamp}.{format}"
+            logger.info(f"Generated filename from professor's name: {filename}")
+        
+        # Fallback to URL-based naming if the name is not available
+        if not filename:
+            logger.warning("Professor name not found in data, falling back to URL-based filename.")
+            domain = url.split('/')[2].replace('.', '_')
+            path_part = url.split('/')[-1] or url.split('/')[-2] # Get last part of path
+            safe_path = "".join(c if c.isalnum() else "_" for c in path_part)[:50] # Sanitize
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{domain}_{safe_path}_{timestamp}.{format}"
+
+    except Exception as e:
+        logger.error(f"Error creating dynamic filename, using fallback. Error: {e}")
+        # Final fallback in case of any unexpected error
         filename = f"profile_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{format}"
 
     filepath = os.path.join(output_dir, filename)
@@ -40,17 +61,6 @@ def save_output(data: Dict, output_dir: str, url: str, format: str = "json"):
         with open(filepath, 'w', encoding='utf-8') as f:
             if format == "json":
                 json.dump(data, f, indent=4, ensure_ascii=False)
-            # Add CSV/Markdown formatters here if needed
-            # elif format == "csv":
-            #     # Requires flattening the data (e.g., using pandas)
-            #     # df = pd.json_normalize(data) # Basic flattening
-            #     # df.to_csv(filepath, index=False)
-            #     logger.warning("CSV output not fully implemented.")
-            #     f.write(json.dumps(data)) # Fallback to JSON string
-            # elif format == "md":
-            #     # Requires converting JSON to Markdown string
-            #     logger.warning("Markdown output not fully implemented.")
-            #     f.write(f"# Academic Profile Data\n\n```json\n{json.dumps(data, indent=2)}\n```") # Basic MD output
             else:
                  logger.error(f"Unsupported output format: {format}")
                  return None
@@ -68,41 +78,37 @@ async def process_url(url: str, args: argparse.Namespace):
     log_prefix = f"Processing {url} - "
     logger.info(f"{log_prefix}Starting...")
 
-    # Initialize components
+    # Initialize the main orchestrator which handles all sub-components
     orchestrator = ScrapeOrchestrator()
-    content_processor = ContentProcessor()
-    schema_generator = SchemaGenerator()
-    validator = ContentValidator() # Use validator from scraping_manager
 
     final_output_data = None
-    schema = None
-    schema_version = None
-    schema_docs = None
 
     try:
-        # --- Phase 2: Scraping ---
-        raw_output = await orchestrator.get_and_process_content(url)
+        # --- Scrape and Process ---
+        # The orchestrator now handles the entire pipeline:
+        # scrape -> clean -> generate schema -> extract -> qc
+        final_output_data = await orchestrator.get_and_process_content(url)
 
-        if not raw_output:
-            logger.error(f"{log_prefix}Failed to retrieve and process content.")
+        if not final_output_data:
+            logger.error(f"{log_prefix}Failed to retrieve and process content. No output generated.")
             return # Stop processing this URL
 
-        logger.info(f"{log_prefix}Successfully processed content.")
-        logger.debug(f"{log_prefix}Raw output keys: {list(raw_output.keys())}")
+        logger.info(f"{log_prefix}Successfully processed and structured content.")
+        logger.debug(f"{log_prefix}Final output keys: {list(final_output_data.keys())}")
 
-        # Save the final output
-        save_output(raw_output, args.output, url, args.format)
+        # --- Save the final output ---
+        save_output(final_output_data, args.output, url, args.format)
         logger.info(f"{log_prefix}Processing finished successfully.")
 
     except Exception as e:
-        logger.exception(f"{log_prefix}An unexpected error occurred: {e}")
-        # Save error state
+        logger.exception(f"{log_prefix}An unexpected error occurred during the main process: {e}")
+        # Save an error state file
         error_metadata = {
             'source_url': url,
             'timestamp': datetime.now().isoformat(),
             'status': 'error',
             'error_message': str(e),
-            'schema_version_attempted': schema_version
+            'schema_version_attempted': final_output_data.get("metadata", {}).get("schema_version") if final_output_data else None
         }
         save_output({'metadata': error_metadata}, config.OUTPUT_DIR, url, "json")
 

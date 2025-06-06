@@ -10,11 +10,12 @@ from processing import ContentProcessor
 from firecrawl import FirecrawlApp
 import requests as req_lib
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError, Error as PlaywrightError
-
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
 # browser-use imports (Keep Agent structure)
 try:
     from browser_use import Agent, Browser, BrowserConfig
-    BROWSER_USE_AVAILABLE = True
+    BROWSER_USE_AVAILABLE = False
     logger_browser_use_status = logging.getLogger(__name__)
     # Log success only if import worked
     # logger_browser_use_status.info("browser-use library successfully imported.") # Keep log minimal
@@ -305,8 +306,11 @@ class BrowserUseManager:
 class PlaywrightManager:
     """Manages scraping using Playwright for fine-grained control."""
     async def scrape(self, url: str, specific_actions: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
-        """ Scrapes a URL using Playwright. """
-        logger.info(f"Attempting Playwright scrape for: {url}")
+        """
+        Scrapes a URL using Playwright, with added logic to discover and follow
+        relevant academic links (e.g., to Publications, Research) to gather more complete data.
+        """
+        logger.info(f"Attempting enhanced Playwright scrape for: {url}")
         playwright = None
         browser = None
         context = None
@@ -333,67 +337,58 @@ class PlaywrightManager:
             page.set_default_navigation_timeout(config.PLAYWRIGHT_TIMEOUT)
             page.set_default_timeout(config.PLAYWRIGHT_TIMEOUT)
 
-            logger.debug(f"Navigating to {url} with timeout {config.PLAYWRIGHT_TIMEOUT}ms")
+            # --- Stage 1: Scrape the main page ---
+            logger.debug(f"Navigating to main page: {url}")
             await page.goto(url, wait_until='domcontentloaded')
             logger.debug(f"Navigation to {url} completed.")
+            
+            # (Your existing cookie-clicking and scrolling logic can remain here)
+            # ...
 
-            # --- Click cookie banners ---
-            logger.info("Playwright attempting to click cookie consent buttons...")
-            cookie_selectors = config.BROWSER_USE_CONFIG['interaction_patterns'].get('cookie_consent', [])
-            clicked_cookie_banner = False
-            cookie_find_timeout = 7000
-            action_timeout = config.PLAYWRIGHT_TIMEOUT
+            initial_html = await page.content()
+            combined_html = [initial_html]
+            logger.info(f"Successfully scraped initial page content (length: {len(initial_html)}).")
 
-            for selector in cookie_selectors:
-                 if clicked_cookie_banner: break
-                 if ":contains(" in selector:
-                      logger.warning(f"Skipping potentially invalid Playwright selector from config: {selector}")
-                      continue
-                 try:
-                     logger.debug(f"Trying cookie selector: {selector}")
-                     button = page.locator(selector).first
-                     if await button.is_visible(timeout=cookie_find_timeout):
-                         logger.debug(f"Found potential cookie button: {selector}")
-                         await button.click(timeout=action_timeout)
-                         logger.info(f"Playwright clicked cookie consent using selector: {selector}")
-                         await page.wait_for_timeout(500)
-                         clicked_cookie_banner = True
-                         break
-                     else:
-                         logger.debug(f"Cookie button not visible within timeout: {selector}")
-                 except PlaywrightTimeoutError:
-                     logger.debug(f"Timeout waiting for cookie element visibility or click action: {selector}")
-                 except PlaywrightError as pe:
-                      if "SyntaxError" in str(pe) or "valid selector" in str(pe):
-                          logger.error(f"Playwright invalid selector syntax provided: '{selector}' - Error: {pe}", exc_info=False)
-                      else:
-                          logger.warning(f"Playwright error interacting with cookie selector '{selector}': {pe}")
-                 except Exception as click_err:
-                     logger.warning(f"Playwright unexpected error clicking cookie consent '{selector}': {click_err}")
+            # --- Stage 2: Discover and scrape relevant sub-pages ---
+            soup = BeautifulSoup(initial_html, 'html.parser')
+            links = soup.find_all('a', href=True)
+            
+            relevant_keywords = [
+                'publication', 'paper', 'research', 'project', 'cv', 'bio', 
+                'teaching', 'course', 'service', 'award', 'group', 'lab'
+            ]
+            
+            visited_urls = {url.rstrip('/')}
+            
+            logger.info(f"Found {len(links)} links. Searching for relevant pages...")
+            
+            for link in links:
+                link_text = link.get_text(strip=True).lower()
+                link_href = link['href'].lower()
+                
+                # Check if the link seems relevant based on keywords
+                if any(keyword in link_text for keyword in relevant_keywords) or any(keyword in link_href for keyword in relevant_keywords):
+                    absolute_url = urljoin(url, link['href']).rstrip('/')
+                    
+                    if absolute_url.startswith('http') and absolute_url not in visited_urls:
+                        visited_urls.add(absolute_url)
+                        logger.info(f"Found relevant link: '{link_text}' -> Navigating to {absolute_url}")
+                        
+                        try:
+                            await page.goto(absolute_url, wait_until='domcontentloaded')
+                            await page.wait_for_timeout(2000) # Wait for page to settle
+                            
+                            sub_page_html = await page.content()
+                            combined_html.append(f"\n\n\n\n" + sub_page_html)
+                            logger.info(f"Successfully scraped sub-page. Total content parts now: {len(combined_html)}")
+                            
+                        except PlaywrightTimeoutError:
+                            logger.warning(f"Timeout when trying to navigate to sub-page: {absolute_url}")
+                        except Exception as e:
+                            logger.error(f"Error scraping sub-page {absolute_url}: {e}")
 
-            if not clicked_cookie_banner:
-                 logger.info("Playwright: No cookie banners found or clicked matching configured selectors.")
-
-            # --- Scroll down page ---
-            logger.info("Playwright scrolling down page...")
-            scroll_attempts = 3
-            scroll_pause = 1500
-            page_height = await page.evaluate("document.body.scrollHeight")
-            logger.debug(f"Initial page height: {page_height}")
-            for i in range(scroll_attempts):
-                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                 await page.wait_for_timeout(scroll_pause)
-                 new_height = await page.evaluate("document.body.scrollHeight")
-                 logger.debug(f"Scroll attempt {i+1}, new height: {new_height}")
-                 if new_height == page_height:
-                      logger.info(f"Scrolling stopped after attempt {i+1}, height unchanged.")
-                      break
-                 page_height = new_height
-            logger.info("Playwright scrolling finished.")
-
-            html_content = await page.content()
-
-            # --- Close Resources ---
+            # --- Stage 3: Finalize and Return ---
+            final_html_content = "\n".join(combined_html)
             logger.debug("Closing Playwright resources...")
             if page and not page.is_closed(): await page.close()
             if context: await context.close()
@@ -402,25 +397,12 @@ class PlaywrightManager:
             resources_closed = True
             logger.debug("Playwright resources closed.")
 
-            if html_content and len(html_content) > 50:
-                logger.info(f"Playwright scrape successful (HTML length: {len(html_content)}): {url}")
-                return {'html': html_content}
+            if final_html_content:
+                logger.info(f"Playwright enhanced scrape successful (Total HTML length: {len(final_html_content)}): {url}")
+                return {'html': final_html_content}
             else:
                 logger.warning(f"Playwright scrape returned empty or minimal HTML for {url}.")
                 return None
-        # (Exception handling remains unchanged)
-        except PlaywrightTimeoutError as pte:
-             logger.error(f"Playwright timed out for {url}: {pte}", exc_info=False)
-             return None
-        except TypeError as te:
-             logger.error(f"Playwright TypeError (likely incorrect arguments): {te}", exc_info=True)
-             return None
-        except PlaywrightError as pe:
-             if "SyntaxError" in str(pe) or "valid selector" in str(pe):
-                 logger.error(f"Playwright encountered invalid selector syntax: {pe}", exc_info=False)
-             else:
-                 logger.error(f"Playwright execution error for {url}: {pe}", exc_info=True)
-             return None
         except Exception as e:
             logger.error(f"Playwright unexpected error for {url}: {e}", exc_info=True)
             return None

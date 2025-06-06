@@ -1,0 +1,120 @@
+{
+    "version": "v35",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "office_location": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "full_name"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research_interests": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    },
+                    "major": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "patents": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "grants": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "awards_and_honors": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "rankings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string"
+                    },
+                    "area": {
+                        "type": "string"
+                    },
+                    "rank": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "source",
+                    "area"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema defines the structure for a comprehensive academic profile.  It includes sections for personal information (full name, title, email, phone, office location, department, institution), biography, research interests, education history (degree, institution, year, major), publications, patents, grants, awards and honors, affiliations, and rankings.  Arrays are used to accommodate multiple entries in each category.  The `personal_info` object is comprehensive, and education details are in a dedicated `education` section.  Email format is validated."
+}

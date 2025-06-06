@@ -1,0 +1,107 @@
+{
+    "version": "v34",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "full_name"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research_interests": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "patents": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "grants": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "awards_and_honors": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "rankings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string"
+                    },
+                    "area": {
+                        "type": "string"
+                    },
+                    "rank": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "source",
+                    "area"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema includes personal information, biography, research interests, education history, and sections for publications, patents, grants, awards, affiliations, and rankings.  The array structures allow for multiple entries in each category.  The rankings section is modified to be an array of objects to handle multiple ranking sources and areas."
+}
