@@ -1,0 +1,145 @@
+{
+    "version": "v31",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "office_location": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "full_name"
+            ]
+        },
+        "mission_statement": {
+            "type": "string"
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research_interests": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "major": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    },
+                    "pdf_link": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "patents": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "grants": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "awards_and_honors": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            }
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema provides a comprehensive structure for academic profiles.  It includes detailed personal information, a mission statement, biography, research interests, education history, publications, patents, grants, awards and affiliations.  Each section is designed to accommodate various data types and levels of detail.  The use of arrays allows for multiple entries in each category.  Data types are strictly enforced to ensure data integrity.  URL formats are validated where applicable."
+}

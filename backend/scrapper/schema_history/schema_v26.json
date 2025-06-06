@@ -1,0 +1,115 @@
+{
+    "version": "v26",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "markdown": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "markdown"
+            ]
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "interests"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "position",
+                "institution",
+                "description"
+            ]
+        },
+        "education": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "degree": {
+                        "type": "string"
+                    },
+                    "institution": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "degree",
+                    "institution"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema (v26) improves upon v25 by providing more nuanced structures for biography, research, and publications.  The biography now accepts markdown for richer text formatting. The research section includes a description field to capture unstructured text. The publications section is enhanced to include title, venue, date, URL, and abstract.  The mission statement is incorporated into the biography.  The 'latest_news' field from v25 is removed as it's redundant given the improved publications section."
+}

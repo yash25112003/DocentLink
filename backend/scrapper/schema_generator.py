@@ -1,169 +1,90 @@
+# schema_generator.py
 import json
-import os
 import logging
 from typing import Dict, Any, Tuple, Optional
 
-import config
-from llm_handler import _call_gemini_api
+from llm_handler import _call_gemini_api # Assumes llm_handler.py is in the same path
 
 logger = logging.getLogger(__name__)
 
 class SchemaGenerator:
-    """Generates and manages schemas for academic content extraction."""
-    
+    """Generates dynamic schemas for academic content extraction based on the content itself."""
+
     def __init__(self):
-        self.history_dir = config.SCHEMA_HISTORY_DIR
-        os.makedirs(self.history_dir, exist_ok=True)
-        logger.info(f"SchemaGenerator initialized. History directory: {self.history_dir}")
+        logger.info("SchemaGenerator initialized for dynamic, content-aware schema generation.")
 
-    def _load_schema_history(self) -> Dict[str, Dict]:
-        """Loads all schema versions from the history directory."""
-        schemas = {}
-        try:
-            for filename in os.listdir(self.history_dir):
-                if filename.startswith('schema_v') and filename.endswith('.json'):
-                    version = filename.split('_')[1].split('.')[0]
-                    with open(os.path.join(self.history_dir, filename), 'r') as f:
-                        schemas[version] = json.load(f)
-            logger.info(f"Loaded {len(schemas)} schema versions from history.")
-            return schemas
-        except Exception as e:
-            logger.error(f"Error loading schema history: {e}")
-            return {}
-
-    def _save_schema(self, version: str, schema: Dict) -> None:
-        """Saves a schema version to the history directory."""
-        try:
-            filename = f"schema_{version}.json"
-            with open(os.path.join(self.history_dir, filename), 'w') as f:
-                json.dump(schema, f, indent=2)
-            logger.info(f"Saved schema version {version} to {filename}")
-        except Exception as e:
-            logger.error(f"Error saving schema version {version}: {e}")
-
-    def _generate_new_schema(self, content: Dict[str, str]) -> Tuple[Dict, str, str]:
-        """Generates a new schema based on the content using LLM."""
+    def _build_dynamic_schema_prompt(self, clean_content: str) -> str:
+        """Constructs a prompt that asks the LLM to generate a schema FROM the content."""
+        # Truncate content to avoid exceeding LLM token limits
         prompt = f"""
-        Analyze the following academic content and generate a JSON schema that best represents its structure.
-        The schema should be comprehensive enough to capture all relevant academic information.
+        Objective: Analyze the provided text from an academic's webpage and generate a comprehensive JSON schema that can capture all the information present. The goal is to create a schema that, when populated, will result in a 100% complete representation of the source text.
 
-        Content:
-        {json.dumps(content, indent=2)}
+        Source Text:
+        ---
+        {clean_content[:8000]}
+        ---
 
-        Requirements:
-        1. The schema should include fields for all major academic sections (biography, research, publications, etc.)
-        2. Each field should have appropriate type definitions and descriptions
-        3. Include nested objects for complex sections (e.g., publications list)
-        4. Make the schema flexible enough to handle variations in content structure
+        Instructions for Schema Generation:
+        1.  **Analyze the Entire Text**: Read through the text to identify all distinct sections and data points. This includes personal details, biography, mission statements, research interests, publications, educational background, teaching roles, awards, grants, contact information, etc.
+        2.  **Design a Nested Structure**: Create a JSON schema with nested objects and lists to represent the data logically.
+            * `personal_info`: An object for name, title, email, phone, office, website links, department, and institution.
+            * `biography`: A string that can hold the main descriptive text.
+            * `research`: An object containing `interests` (list of strings), an `overview`, and a list of `projects`.
+            * `publications`: A list of objects. Each object should have fields like `title`, `authors` (list of strings), `venue`, `year` (integer), `url`, and `description` or `abstract`.
+            * `education`: A list of objects for degrees. Each object should have `degree`, `field`, `institution`, and `year`.
+            * `teaching`: An object describing teaching roles and a list of `courses`.
+            * `awards_and_honors`: A list of objects, each with `title`, `organization`, and `year`.
+        3.  **Be Comprehensive**: If you identify other structured data (e.g., patents, affiliations, service), create appropriate keys and structures for them.
+        4.  **Use Appropriate Data Types**: Use "string", "integer", "list[string]", "object", and "list[object]".
+        5.  **Output Format**: Respond with ONLY the JSON schema object. Do not wrap it in markdown or add any explanatory text outside the JSON structure.
 
-        Return a JSON object with:
-        - schema: The generated JSON schema
-        - version: A version string (e.g., "v18")
-        - justification: A brief explanation of why this schema is appropriate
-
-        Example format:
-        {{
-            "schema": {{
-                "biography": {{
-                    "type": "object",
-                    "properties": {{
-                        "markdown": {{ "type": "string" }},
-                        "html": {{ "type": "string" }}
-                    }}
-                }},
-                ...
-            }},
-            "version": "v18",
-            "justification": "This schema captures the key academic sections..."
-        }}
+        Now, generate the schema for the source text provided above.
         """
+        return prompt
+
+    def generate_schema_from_content(self, clean_content: str) -> Tuple[Optional[Dict], Optional[str], Optional[str]]:
+        """
+        Analyzes content and uses an LLM to generate a new, dynamic schema.
+
+        Returns:
+            A tuple containing: (schema dictionary, schema version string, schema documentation string)
+        """
+        logger.info("Generating a new dynamic schema from content...")
+        prompt = self._build_dynamic_schema_prompt(clean_content)
+
+        llm_response_str = _call_gemini_api(prompt)
+
+        if not llm_response_str:
+            logger.error("Failed to get response from LLM for dynamic schema generation.")
+            return None, None, None
 
         try:
-            response = _call_gemini_api(prompt)
-            if not response:
-                raise ValueError("LLM returned empty response")
-            
-            # Clean and parse the response
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[len("```json"):].strip()
-            if response.endswith("```"):
-                response = response[:-len("```")].strip()
-            
-            result = json.loads(response)
-            return result["schema"], result["version"], result["justification"]
+            # Clean the response string
+            if llm_response_str.startswith("```json"):
+                llm_response_str = llm_response_str[len("```json"):].strip()
+            if llm_response_str.endswith("```"):
+                llm_response_str = llm_response_str[:-len("```")].strip()
+
+            schema = json.loads(llm_response_str)
+            version = "dynamic-v1.0"
+            documentation = "This schema was dynamically generated by an LLM to specifically match the structure of the provided content, aiming for maximum data capture."
+            logger.info("Successfully generated and parsed dynamic schema from LLM response.")
+            return schema, version, documentation
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON from LLM for schema generation: {e}\nRaw response was:\n{llm_response_str}")
+            return None, None, None
         except Exception as e:
-            logger.error(f"Error generating new schema: {e}")
-            return {}, "v0", "Failed to generate schema"
+            logger.error(f"An unexpected error occurred during schema generation: {e}")
+            return None, None, None
 
-    def analyze_and_generate_schema(self, content: Dict[str, str]) -> Tuple[Dict, str, str]:
-        """Analyzes content and either uses an existing schema or generates a new one."""
-        logger.info("Starting schema analysis and generation...")
-        
-        # Load existing schemas
-        schemas = self._load_schema_history()
-        if not schemas:
-            logger.info("No existing schemas found. Generating new schema.")
-            schema, version, justification = self._generate_new_schema(content)
-            self._save_schema(version, schema)
-            return schema, version, justification
-
-        # Use LLM to decide whether to use existing schema or generate new one
-        prompt = f"""
-        Analyze the following content and existing schemas to determine if a new schema is needed.
-        
-        Content:
-        {json.dumps(content, indent=2)}
-
-        Existing Schema Versions:
-        {json.dumps(list(schemas.keys()), indent=2)}
-
-        Latest Schema (v{max(schemas.keys(), key=lambda x: int(x[1:]))}):
-        {json.dumps(schemas[max(schemas.keys(), key=lambda x: int(x[1:]))], indent=2)}
-
-        Decide whether to:
-        1. Use the latest schema (return "use_latest")
-        2. Generate a new schema (return "propose_new")
-
-        If proposing new, also provide:
-        - version: Next version number (e.g., "v18")
-        - justification: Why a new schema is needed
-
-        Return a JSON object with:
-        {{
-            "decision": "use_latest" or "propose_new",
-            "version": "vX" (only if proposing new),
-            "justification": "..." (only if proposing new)
-        }}
+    def analyze_and_generate_schema(self, content: Dict[str, str]) -> Tuple[Optional[Dict], Optional[str], Optional[str]]:
         """
+        Main entry point for the class, designed to be called by the processor.
+        It flattens the input content and generates a dynamic schema.
+        """
+        full_text = "\n\n".join(f"# {key}\n{value}" for key, value in content.items() if isinstance(value, str))
+        if not full_text:
+            full_text = str(content)
 
-        try:
-            response = _call_gemini_api(prompt)
-            if not response:
-                raise ValueError("LLM returned empty response")
-            
-            # Clean and parse the response
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[len("```json"):].strip()
-            if response.endswith("```"):
-                response = response[:-len("```")].strip()
-            
-            decision = json.loads(response)
-            
-            if decision["decision"] == "use_latest":
-                latest_version = max(schemas.keys(), key=lambda x: int(x[1:]))
-                logger.info(f"LLM decision: use_latest, Version: {latest_version}")
-                return schemas[latest_version], latest_version, "Using latest schema"
-            else:
-                logger.info(f"LLM decision: propose_new, Version: {decision['version']}, Justification: {decision['justification']}")
-                schema, version, justification = self._generate_new_schema(content)
-                self._save_schema(version, schema)
-                logger.info(f"Successfully proposed and saved new schema version {version}.")
-                return schema, version, justification
-                
-        except Exception as e:
-            logger.error(f"Error in schema analysis: {e}")
-            # Fallback to latest schema
-            latest_version = max(schemas.keys(), key=lambda x: int(x[1:]))
-            return schemas[latest_version], latest_version, "Error in analysis, using latest schema" 
+        return self.generate_schema_from_content(full_text)

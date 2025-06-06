@@ -1,0 +1,120 @@
+{
+    "version": "v29",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "interests"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    },
+                    "link": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "pdf_link": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "teaching_experience": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "lab": {
+                    "type": "string"
+                },
+                "phd_institution": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "position",
+                "institution"
+            ]
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema (v29) extends v28 by adding 'affiliations' and restructuring 'teachingExperience' to better represent the provided data.  The 'research' section maintains the 'interests' array and adds a 'description' field. The 'publications' section now includes separate 'link' and 'pdf_link' fields to handle different types of links. The 'teaching' section from v28 has been replaced with a more specific 'teaching_experience' section to better reflect the provided data.  All fields use snake_case naming convention.  Required fields are explicitly specified within each object."
+}

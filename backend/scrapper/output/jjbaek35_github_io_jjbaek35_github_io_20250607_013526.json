@@ -1,0 +1,149 @@
+{
+    "metadata": {
+        "source_url": "https://jjbaek35.github.io",
+        "schema_version": "v31",
+        "timestamp": "2025-06-07T01:35:26.513753",
+        "scraping_tool_used": "browser-use",
+        "status": "success"
+    },
+    "schema_documentation": "This schema provides a comprehensive structure for academic profiles.  It includes detailed personal information, a mission statement, biography, research interests, education history, publications, patents, grants, awards and affiliations.  Each section is designed to accommodate various data types and levels of detail.  The use of arrays allows for multiple entries in each category.  Data types are strictly enforced to ensure data integrity.  URL formats are validated where applicable.",
+    "quality_control": {
+        "completeness_score": 1.0,
+        "missing_fields": [],
+        "notes": [
+            "Data completeness is high, indicating most schema fields were populated."
+        ]
+    },
+    "profile_data": {
+        "personal_info": {
+            "full_name": "Jaejong Baek",
+            "title": "Assistant Teaching Professor",
+            "email": "jaejong at asu . edu",
+            "phone": null,
+            "office_location": null,
+            "department": "School of Computing and Augmented Intelligence SCAI",
+            "institution": "Arizona State University"
+        },
+        "mission_statement": "On advancing my expertise in cybersecurity and undertaking critical challenges,my goal is to deliver my insights and findings to the pedagogical and research activities so that it would tremendously help produce future leaders who would effectively manage our national cybersecurity issues.",
+        "biography": "Hello, I am an Assistant Teaching Professor at Arizona State University, School of Computing and Augmented Intelligence SCAI and the SEFCOM lab. I received my Ph.D. from Yonsei University in South Korea. My research interests lie in mobile and wireless network security issues like Telco (5G), Access Control, Blockchain, and Digital Forensics. I don't aim to be the outstanding instructor or researcher—but I do hope to be an educator who prepares with care and teaches with the conviction that I should always be useful to someone, in some way. ☕ After a whirlwind semester teaching four sections with around 700 undergrads and over 100 grad students, I'm grateful to say I made it through! I also wrapped up six master's thesis defenses and two honors thesis reviews. It kind of feels like finishing a marathon. Now it's time for a short break—then back to prepping for the fall semester.",
+        "research_interests": [
+            "mobile and wireless network security",
+            "Telco (5G)",
+            "Access Control",
+            "Blockchain",
+            "Digital Forensics"
+        ],
+        "education": [
+            {
+                "degree": "Ph.D.",
+                "major": null,
+                "institution": "Yonsei University",
+                "year": null
+            }
+        ],
+        "publications": [
+            {
+                "title": "It's almost like Frankenstein: Investigating the Complexities of Scientific Collaboration and Privilege Management within Research Computing Infrastructures",
+                "venue": "46th IEEE Symposium on Security and Privacy",
+                "date": "2025-05-12",
+                "url": "https://www.computer.org/csdl/proceedings-article/sp/2025/223600c995/26hiVfWPKog",
+                "abstract": "This paper examines security considerations in research computing infrastructures (RCIs) through interviews with experts and stakeholders, highlighting a layered access control approach that challenges traditional models, as collaborative, trust-based sharing raises compliance concerns, and concludes with recommendations to enhance RCI security and flexibility.",
+                "pdf_link": null
+            },
+            {
+                "title": "PendingMutent: An Authorization Framework for Preventing PendingIntent Attacks in Android-based Mobile Cyber-Physical Systems,",
+                "venue": "ACM Workshop on Secure and Trustworthy Cyber-Physical Systems (SaT-CPS 2025)",
+                "date": null,
+                "url": "../papers/pending-mutent-satcps2025.pdf",
+                "abstract": null,
+                "pdf_link": "../papers/pending-mutent-satcps2025.pdf"
+            },
+            {
+                "title": "Unveiling SDN Controller Identity through Timing Side Channel",
+                "venue": "15th International Conference on Network of the Future",
+                "date": "2024-10-02",
+                "url": "../papers/nof2024.pdf",
+                "abstract": "This paper presents a novel approach to fingerprinting SDN controllers using timing side channels and deep learning techniques.",
+                "pdf_link": "../papers/nof2024.pdf"
+            },
+            {
+                "title": "Targeted Privacy Attacks by Fingerprinting Mobile Apps in LTE Radio Layer",
+                "venue": "IEEE IFIP DSN 2023",
+                "date": "2023-06-27",
+                "url": "https://sefcom.asu.edu/publications/jaejong-dsn23.pdf",
+                "abstract": "This paper presents novel privacy attacks against LTE using machine learning to identify patterns in the communication between the UEs and eNBs without breaking into users' devices and the base station.",
+                "pdf_link": "https://sefcom.asu.edu/publications/jaejong-dsn23.pdf"
+            },
+            {
+                "title": "SpaceMediator: Leveraging Authorization Policies to Prevent Spatial and Privacy Attacks in Mobile Augmented Reality",
+                "venue": "SACMAT 2023",
+                "date": "2023-06-07",
+                "url": "https://sefcom.asu.edu/publications/jaejong-sactmat23.pdf",
+                "abstract": "We present a new approach for managing access control policies in a mobile augmented reality (MAR) application based on policy-governed MAR apps against space invasion, space affectation attacks, and privacy leaks.",
+                "pdf_link": "https://sefcom.asu.edu/publications/jaejong-sactmat23.pdf"
+            },
+            {
+                "title": "DyPolDroid: Protecting Against Permission-Abuse Attacks in Android",
+                "venue": "Information Systems Frontiers",
+                "date": "2022-08",
+                "url": null,
+                "abstract": null,
+                "pdf_link": null
+            },
+            {
+                "title": "A Secure Distributed Ledger for Transactive Energy: The Electron Volt Exchange",
+                "venue": "Applied Energy",
+                "date": "2020-11",
+                "url": "https://doi.org/10.1016/j.apenergy.2020.116208",
+                "abstract": null,
+                "pdf_link": null
+            },
+            {
+                "title": "Wi Not Calling: Practical Privacy and Availability Attacks in Wi-Fi Calling",
+                "venue": "ACSAC '18",
+                "date": "2018-12-03",
+                "url": "https://adamdoupe.com/publications/wi-not-calling-acsac2018.pdf",
+                "abstract": "In this paper, we analyze the security of Wi-Fi Calling specifications and discover several vulnerabilities that allow an adversary to track the location of users and perform DoS attacks.",
+                "pdf_link": "https://adamdoupe.com/publications/wi-not-calling-acsac2018.pdf"
+            }
+        ],
+        "patents": [
+            {
+                "title": "Systems and Methods for Blockchain-Based Automatic Key Generation",
+                "number": "11588631",
+                "date": "2023-02-21",
+                "url": "https://patentcenter.uspto.gov/applications/17067426"
+            }
+        ],
+        "grants": [
+            {
+                "title": "CICI: UCSS: ScienceAccess: Enabling Zero-Trust Resource Access Management for Scientific Collaborations",
+                "number": "2232911",
+                "amount": "$591,644",
+                "date": "2022-08-29",
+                "url": "https://nsf.gov/awardsearch/showAward?AWD_ID=2232911"
+            }
+        ],
+        "awards_and_honors": [
+            {
+                "title": "Most Innovative Capability in the Blockchain Innovation Challenge",
+                "awarder": "ASURE",
+                "project_title": "Cryptographic Key Management System using a Distributed Shared Ledger",
+                "date": null,
+                "url": "https://twitter.com/ASUREASU/status/1138645169828294656"
+            }
+        ],
+        "affiliations": [
+            {
+                "name": "Arizona State University",
+                "role": "Assistant Teaching Professor",
+                "url": "https://www.asu.edu/"
+            },
+            {
+                "name": "SEFCOM lab",
+                "role": null,
+                "url": null
+            }
+        ]
+    }
+}

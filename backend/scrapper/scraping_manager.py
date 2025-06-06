@@ -4,7 +4,8 @@ import logging
 import json
 import re
 from typing import Tuple, Optional, Dict, Any, List
-
+from datetime import datetime
+from processing import ContentProcessor
 # Scraping Libraries
 from firecrawl import FirecrawlApp
 import requests as req_lib
@@ -445,84 +446,74 @@ class PlaywrightManager:
 
 # --- Orchestrator (Class definition remains unchanged) ---
 class ScrapeOrchestrator:
-    """Orchestrates the scraping process using multiple strategies."""
+    """Orchestrates the scraping and new processing pipeline."""
     def __init__(self):
         self.firecrawl_manager = None
         try:
             if config.FIRE_CRAWL_API_KEY:
-                 self.firecrawl_manager = FirecrawlManager(api_key=config.FIRE_CRAWL_API_KEY)
-                 logger.info("Orchestrator: FirecrawlManager initialized.")
+                self.firecrawl_manager = FirecrawlManager(api_key=config.FIRE_CRAWL_API_KEY)
+                logger.info("Orchestrator: FirecrawlManager initialized.")
             else:
-                 logger.warning("Orchestrator: Firecrawl API key missing. FirecrawlManager disabled.")
+                logger.warning("Orchestrator: Firecrawl API key missing. FirecrawlManager disabled.")
         except ValueError as e:
-             logger.error(f"Orchestrator: Failed to initialize FirecrawlManager: {e}")
-             self.firecrawl_manager = None
+            logger.error(f"Orchestrator: Failed to initialize FirecrawlManager: {e}")
+            self.firecrawl_manager = None
 
         self.browser_use_manager = BrowserUseManager()
         self.playwright_manager = PlaywrightManager()
-        self.validator = ContentValidator()
-        logger.info("ScrapeOrchestrator initialized.")
+        self.processor = ContentProcessor() # Initialize the new processor
+        logger.info("ScrapeOrchestrator initialized with integrated ContentProcessor.")
 
-    async def get_content(self, url: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-        """Tries scraping methods in order: Firecrawl -> Browser-Use -> Playwright."""
+    async def get_and_process_content(self, url: str) -> Optional[Dict[str, Any]]:
+        """
+        Main entry point. Scrapes a URL, then processes the content to return a final, structured JSON.
+        """
         raw_output = None
         source_tool = None
 
+        # --- Stage 1: Scraping (same logic as before) ---
         # 1. Try Firecrawl
         if self.firecrawl_manager:
             logger.info(f"Orchestrator: ---> [1] Trying Firecrawl for {url}")
-            raw_output = self.firecrawl_manager.scrape(url) # Sync call
-            if raw_output:
-                content_key = next((k for k in ['markdown', 'data', 'html'] if k in raw_output and raw_output[k]), None)
-                if content_key:
-                     logger.info(f"Orchestrator: Firecrawl succeeded ({content_key} found) for {url}.")
-                     source_tool = 'firecrawl'
-                     return raw_output, source_tool
-                else:
-                     logger.warning(f"Orchestrator: Firecrawl returned a response but no content. Falling back.")
-                     raw_output = None
+            raw_output = self.firecrawl_manager.scrape(url)
+            if raw_output and (raw_output.get('markdown') or raw_output.get('html') or raw_output.get('data')):
+                source_tool = 'firecrawl'
+                logger.info(f"Orchestrator: Firecrawl succeeded for {url}.")
             else:
-                 logger.warning(f"Orchestrator: Firecrawl scrape method returned None. Falling back.")
-        else:
-             logger.info("Orchestrator: ---> [1] Skipping Firecrawl (unavailable or failed init).")
+                raw_output = None # Ensure it's None if content is empty
 
-        # 2. Try Browser-Use (if available AT RUNTIME)
-        if BROWSER_USE_AVAILABLE:
+        # 2. Try Browser-Use (if no success yet and available)
+        if not raw_output and BROWSER_USE_AVAILABLE:
             logger.info(f"Orchestrator: ---> [2] Trying browser-use for {url}")
-            raw_output = await self.browser_use_manager.scrape(url) # Async call
+            raw_output = await self.browser_use_manager.scrape(url)
             if raw_output:
                 source_tool = 'browser-use'
-                extraction_format = config.BROWSER_USE_CONFIG.get('extraction_strategy', 'markdown')
-                content_key = extraction_format if extraction_format in raw_output and raw_output[extraction_format] else None
-                if not content_key and 'html' in raw_output and raw_output['html']: content_key = 'html'
+                logger.info(f"Orchestrator: browser-use succeeded for {url}.")
 
-                if content_key:
-                    logger.info(f"Orchestrator: browser-use succeeded ({content_key} found) for {url}.")
-                    return raw_output, source_tool
-                else:
-                     logger.warning(f"Orchestrator: browser-use returned empty/unexpected content. Falling back.")
-                     raw_output = None; source_tool = None
+        # 3. Try Playwright (if still no success)
+        if not raw_output:
+            logger.info(f"Orchestrator: ---> [3] Trying Playwright for {url}")
+            raw_output = await self.playwright_manager.scrape(url)
+            if raw_output:
+                source_tool = 'playwright'
+                logger.info(f"Orchestrator: Playwright succeeded for {url}.")
+
+        # --- Stage 2: Processing ---
+        if raw_output and source_tool:
+            logger.info(f"Content scraped via {source_tool}. Handing off to ContentProcessor.")
+            
+            final_output = self.processor.process_and_structure(raw_output, source_url=url)
+            
+            if final_output:
+                # Enrich metadata
+                final_output["metadata"]["timestamp"] = datetime.now().isoformat()
+                final_output["metadata"]["scraping_tool_used"] = source_tool
+                final_output["metadata"]["status"] = "success"
+                logger.info(f"Successfully processed and structured data for {url}.")
+                return final_output
             else:
-                 logger.warning(f"Orchestrator: browser-use scrape method returned None. Falling back.")
+                logger.error(f"Content processing failed for scraped data from {url}.")
+                return None
         else:
-            # Logged at init and import time, keep this minimal
-            logger.info("Orchestrator: ---> [2] Skipping browser-use (unavailable in runtime environment).")
-
-        # 3. Try Playwright (Fallback)
-        logger.info(f"Orchestrator: ---> [3] Trying Playwright for {url}")
-        raw_output = await self.playwright_manager.scrape(url) # Async
-        if raw_output:
-            source_tool = 'playwright'
-            if raw_output.get('html'):
-                 logger.info(f"Orchestrator: Playwright succeeded (HTML found) for {url}.")
-                 return raw_output, source_tool
-            else:
-                 logger.warning("Orchestrator: Playwright returned empty HTML content. No more fallbacks.")
-                 raw_output = None; source_tool = None
-        else:
-             logger.warning(f"Orchestrator: Playwright scrape method returned None. No more fallbacks.")
-
-
-        # 4. If all methods failed
-        logger.error(f"Orchestrator: All scraping methods failed to retrieve content for {url}.")
-        return None, None
+            logger.error(f"All scraping methods failed for {url}. No content to process.")
+            return None

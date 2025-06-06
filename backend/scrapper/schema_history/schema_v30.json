@@ -1,0 +1,123 @@
+{
+    "version": "v30",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "mission_statement": {
+            "type": "string"
+        },
+        "biography": {
+            "type": "string"
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "interests"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    },
+                    "link": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "pdf_link": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "teaching_experience": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "lab": {
+                    "type": "string"
+                },
+                "phd_institution": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "position",
+                "institution"
+            ]
+        },
+        "affiliations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            }
+        }
+    },
+    "documentation": "This schema (v30) extends v29 by adding a 'mission_statement' field to store the individual's mission statement.  All other fields remain the same as in v29.  The 'mission_statement' field is a string type and is intended to capture a concise statement of the individual's professional goals and aspirations.  All other fields maintain their definitions from v29."
+}

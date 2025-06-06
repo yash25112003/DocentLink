@@ -2,81 +2,12 @@
   "type": "object",
   "properties": {
     "biography": {
-      "type": "object",
-      "properties": {
-        "markdown": {
-          "type": "string",
-          "description": "Biography in Markdown format."
-        },
-        "image": {
-          "type": "string",
-          "description": "URL or path to a profile image."
-        },
-        "missionStatement": {
-          "type": "string",
-          "description": "Mission statement of the individual."
-        },
-        "aboutMe": {
-          "type": "string",
-          "description": "A free-form description of the individual."
-        },
-        "contact": {
-          "type": "string",
-          "description": "Contact information."
-        }
-      },
-      "required": [
-        "markdown"
-      ]
+      "type": "string",
+      "description": "A biographical description of the academic."
     },
     "research": {
-      "type": "object",
-      "properties": {
-        "interests": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of research interests."
-        },
-        "latestNews": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "title": {
-                "type": "string",
-                "description": "Title of the news item."
-              },
-              "description": {
-                "type": "string",
-                "description": "Description of the news item."
-              },
-              "url": {
-                "type": "string",
-                "description": "URL related to the news item (e.g., publication, award)."
-              },
-              "date": {
-                "type": "string",
-                "format": "date",
-                "description": "Date of the news item."
-              },
-              "type": {
-                "type": "string",
-                "description": "Type of news item (e.g., publication, award, grant)."
-              }
-            },
-            "required": [
-              "title",
-              "description"
-            ]
-          }
-        }
-      },
-      "required": [
-        "interests",
-        "latestNews"
-      ]
+      "type": "string",
+      "description": "A description of the academic's research interests and activities."
     },
     "publications": {
       "type": "array",
@@ -84,92 +15,64 @@
         "type": "object",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Title of the publication."
           },
-          "authors": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "link": {
+            "type": "string",
+            "format": "url",
+            "description": "URL or link to the publication."
           },
           "venue": {
-            "type": "string"
+            "type": "string",
+            "description": "Publication venue (e.g., conference, journal)."
           },
-          "year": {
-            "type": "integer"
-          },
-          "url": {
-            "type": "string"
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Publication date."
           },
           "abstract": {
-            "type": "string"
-          },
-          "type": {
             "type": "string",
-            "description": "Type of publication (e.g., journal article, conference paper, patent)"
-          },
-          "impactFactor": {
-            "type": "number",
-            "description": "Impact factor of the journal (if applicable)"
+            "description": "Abstract of the publication (optional)."
           }
         },
         "required": [
           "title",
-          "venue",
-          "year"
+          "link"
         ]
-      }
+      },
+      "description": "List of publications."
     },
     "teaching": {
-      "type": "object",
-      "properties": {
-        "position": {
-          "type": "string"
-        },
-        "institution": {
-          "type": "string"
-        },
-        "courses": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "description": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "position",
-        "institution"
-      ]
+      "type": "string",
+      "description": "Information about the academic's teaching experience and roles."
     },
-    "awards": {
+    "affiliations": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Name of the institution."
           },
-          "year": {
-            "type": "integer"
-          },
-          "description": {
-            "type": "string"
+          "role": {
+            "type": "string",
+            "description": "Role at the institution (e.g., Professor, Researcher)."
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "format": "url",
+            "description": "URL of the institution."
           }
         },
         "required": [
-          "name",
-          "year"
+          "name"
         ]
-      }
+      },
+      "description": "List of affiliations."
     }
   },
-  "required": [
-    "biography"
-  ]
+  "additionalProperties": false
 }

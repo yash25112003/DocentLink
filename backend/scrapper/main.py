@@ -14,7 +14,7 @@ nest_asyncio.apply()
 # Project Modules
 import config
 from scraping_manager import ScrapeOrchestrator, ContentValidator
-from processing import ContentExtractor, DataStructurer, QualityControl
+from processing import ContentProcessor
 from llm_handler import SchemaGenerator
 
 # Setup logger for this module
@@ -70,10 +70,8 @@ async def process_url(url: str, args: argparse.Namespace):
 
     # Initialize components
     orchestrator = ScrapeOrchestrator()
-    content_extractor = ContentExtractor()
+    content_processor = ContentProcessor()
     schema_generator = SchemaGenerator()
-    data_structurer = DataStructurer()
-    quality_checker = QualityControl()
     validator = ContentValidator() # Use validator from scraping_manager
 
     final_output_data = None
@@ -83,98 +81,22 @@ async def process_url(url: str, args: argparse.Namespace):
 
     try:
         # --- Phase 2: Scraping ---
-        raw_output, source_tool = await orchestrator.get_content(url)
+        raw_output = await orchestrator.get_and_process_content(url)
 
-        if not raw_output or not source_tool:
-            logger.error(f"{log_prefix}Failed to retrieve content using all methods.")
+        if not raw_output:
+            logger.error(f"{log_prefix}Failed to retrieve and process content.")
             return # Stop processing this URL
 
-        logger.info(f"{log_prefix}Successfully scraped content using {source_tool}.")
+        logger.info(f"{log_prefix}Successfully processed content.")
         logger.debug(f"{log_prefix}Raw output keys: {list(raw_output.keys())}")
 
-
-        # --- Phase 2/4: Section Identification & Initial Cleaning ---
-        clean_content_dict = content_extractor.find_sections(raw_output, source_tool)
-
-        if not clean_content_dict:
-             logger.error(f"{log_prefix}Extracted content is empty after sectioning.")
-             return # Stop processing this URL
-
-        logger.info(f"{log_prefix}Identified {len(clean_content_dict)} potential key sections.")
-        logger.debug(f"{log_prefix}Identified sections: {list(clean_content_dict.keys())}")
-
-        # --- Phase 2 Validation (Post-Sectioning) ---
-        if not validator.is_content_adequate(clean_content_dict):
-             logger.error(f"{log_prefix}Extracted content failed adequacy validation after sectioning.")
-             # Optionally save the inadequate raw/cleaned data for review
-             # save_output({'metadata': {'source_url': url, 'status': 'inadequate_content'}, 'raw_output': raw_output, 'cleaned_sections': clean_content_dict}, config.OUTPUT_DIR, url, "json")
-             return # Stop processing
-
-
-        # --- Phase 3: Schema Design & Versioning ---
-        if args.schema_version:
-            # Load specific version if forced
-            history = schema_generator._load_schema_history() # Use internal method for loading
-            forced_version_key = f"v{args.schema_version}" if not args.schema_version.startswith('v') else args.schema_version
-            if forced_version_key in history:
-                schema_data = history[forced_version_key]
-                schema = schema_data.get('schema')
-                schema_docs = schema_data.get('documentation')
-                schema_version = forced_version_key
-                if not schema or not schema_docs:
-                     logger.error(f"{log_prefix}Forced schema version {schema_version} loaded but is incomplete. Aborting.")
-                     return
-                logger.info(f"{log_prefix}Using forced schema version: {schema_version}")
-            else:
-                logger.error(f"{log_prefix}Forced schema version {forced_version_key} not found in history ({list(history.keys())}). Aborting.")
-                return
-        else:
-            # Analyze content and generate/select schema
-            schema, schema_version, schema_docs = schema_generator.analyze_and_generate_schema(clean_content_dict)
-            if not schema or not schema_version or not schema_docs:
-                 logger.error(f"{log_prefix}Failed to generate or select a schema. Aborting.")
-                 return
-            logger.info(f"{log_prefix}Generated/Selected schema version: {schema_version}")
-
-        logger.debug(f"{log_prefix}Schema to be used:\n{json.dumps(schema, indent=2)}")
-
-
-        # --- Phase 4: Structuring & QC ---
-        structured_data = data_structurer.structure_data(clean_content_dict, schema)
-        logger.info(f"{log_prefix}Structured data according to schema {schema_version}.")
-        logger.debug(f"{log_prefix}Structured data sample:\n{json.dumps(structured_data, indent=2)[:500]}...")
-
-
-        qc_report = quality_checker.run_quality_checks(structured_data, schema)
-        logger.info(f"{log_prefix}Completed quality checks.")
-        logger.debug(f"{log_prefix}QC Report:\n{json.dumps(qc_report, indent=2)}")
-
-
-        # --- Phase 5: Output ---
-        metadata = {
-            'source_url': url,
-            'timestamp': datetime.now().isoformat(),
-            'scraping_tool_used': source_tool,
-            'schema_version': schema_version,
-            'status': 'success'
-        }
-
-        final_output_data = {
-            'metadata': metadata,
-            'schema_documentation': schema_docs,
-            'quality_control': qc_report,
-            'profile_data': structured_data
-            # Optionally include clean_content_dict for debugging:
-            # 'cleaned_content': clean_content_dict
-        }
-
         # Save the final output
-        save_output(final_output_data, args.output, url, args.format)
+        save_output(raw_output, args.output, url, args.format)
         logger.info(f"{log_prefix}Processing finished successfully.")
 
     except Exception as e:
         logger.exception(f"{log_prefix}An unexpected error occurred: {e}")
-        # Optionally save error state
+        # Save error state
         error_metadata = {
             'source_url': url,
             'timestamp': datetime.now().isoformat(),

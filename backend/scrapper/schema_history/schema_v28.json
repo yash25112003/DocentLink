@@ -1,0 +1,112 @@
+{
+    "version": "v28",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "markdown": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "markdown"
+            ]
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "interests"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "courses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "students": {
+                    "type": "object",
+                    "properties": {
+                        "undergraduate": {
+                            "type": "integer"
+                        },
+                        "graduate": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "responsibilities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    },
+    "documentation": "This schema extends v27 to explicitly include an abstract field within the publications array to accommodate the provided example data.  The teaching section is enhanced to include more detailed information, though fields remain optional to accommodate cases where data is unavailable.  The research description field remains a string, allowing for flexibility in the description's format."
+}

@@ -1,0 +1,83 @@
+{
+    "version": "v27",
+    "schema": {
+        "personal_info": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "biography": {
+            "type": "object",
+            "properties": {
+                "markdown": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "markdown"
+            ]
+        },
+        "research": {
+            "type": "object",
+            "properties": {
+                "interests": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "interests"
+            ]
+        },
+        "publications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "venue": {
+                        "type": "string"
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "url"
+                    },
+                    "abstract": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title",
+                    "venue",
+                    "date"
+                ]
+            }
+        },
+        "teaching": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "documentation": "This schema (v27) builds upon v26.  The key changes are:\n\n1. **Publications:** Remains largely the same, but now explicitly allows for an empty array if no publications are listed.\n2. **Research:** The structure remains unchanged, but the example data highlights the need for an array of strings for 'interests'.\n3. **Teaching:** The overly complex nested structure from v26 is simplified to a single description field, as the provided data doesn't justify the more detailed structure.  This allows for flexibility in the future if more teaching data becomes available.\n\nAll other sections remain consistent with v26.  The schema uses snake_case for field names and specifies appropriate data types for each field.  Required fields are indicated using the 'required' keyword."
+}
