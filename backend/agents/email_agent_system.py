@@ -327,8 +327,11 @@ class EmailAgentSystem:
             return {"error": f"Database error fetching user data: {str(e)}"}
 
 
-    async def _fetch_professor_data(self, professor_name: str) -> Dict:
-        """Fetch professor data from JSON files."""
+    async def _fetch_professor_data(self, professor_name: str) -> Optional[Dict]:
+        """
+        Fetch professor data from JSON files.
+        Returns professor data as a dict if found, otherwise returns None.
+        """
         try:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             output_dir = os.path.join(base_dir, 'backend', 'scrapper', 'output')
@@ -342,7 +345,6 @@ class EmailAgentSystem:
             # Normalize the professor name for comparison
             normalized_prof_name = professor_name.lower().replace(" ", "_").replace(".", "")
             logger.info(f"Looking for professor {professor_name} (normalized: {normalized_prof_name}) in {output_dir}")
-            logger.info(f"Available files: {professor_files}")
 
             # Try exact match first
             exact_match_file = None
@@ -371,11 +373,14 @@ class EmailAgentSystem:
                         return data
                 except json.JSONDecodeError as je:
                     logger.error(f"JSON decode error in file {file_path}: {str(je)}")
+                    return {"error": f"JSON decode error in file {file_path}"}
                 except Exception as fe:
                     logger.error(f"Error reading or processing file {file_path}: {str(fe)}")
+                    return {"error": f"Error reading file {file_path}"}
             
-            logger.warning(f"No matching data found for professor: {professor_name} in {output_dir}")
-            return {"error": f"No data found for professor: {professor_name}"}
+            # --- MODIFICATION: Return None if file not found, instead of an error dict ---
+            logger.warning(f"No matching data file found for professor: {professor_name}. Will proceed with fallback.")
+            return None
 
         except Exception as e:
             logger.error(f"Error fetching professor data for {professor_name}: {str(e)}", exc_info=True)
@@ -385,114 +390,133 @@ class EmailAgentSystem:
         """
         Generate personalized email using Gemini, prioritizing resume-extracted data
         and including resume contact details in the signature.
+        Handles both full professor profiles and fallback profiles.
         """
         try:
             if not isinstance(user_data, dict) or not isinstance(professor_data, dict):
                 err_msg = "Invalid input: user_data and professor_data must be dictionaries."
-                logger.error(f"{err_msg} Got user_data: {type(user_data)}, professor_data: {type(professor_data)}") #
+                logger.error(f"{err_msg} Got user_data: {type(user_data)}, professor_data: {type(professor_data)}")
                 return {"error": err_msg}
             if "error" in user_data:
-                return {"error": f"Cannot generate email due to user data error: {user_data['error']}"} #
+                return {"error": f"Cannot generate email due to user data error: {user_data['error']}"}
             if "error" in professor_data:
-                return {"error": f"Cannot generate email due to professor data error: {professor_data['error']}"} #
+                return {"error": f"Cannot generate email due to professor data error: {professor_data['error']}"}
 
-            # --- Enhanced Data Extraction from resume_analysis ---
-            resume_analysis = user_data.get('resume_analysis', {}) #
-            # Ensure raw fields are fetched, default to empty strings if not present
+            # --- Enhanced Data Extraction from resume_analysis (remains the same) ---
+            resume_analysis = user_data.get('resume_analysis', {})
             contact_details_raw = str(resume_analysis.get('contact_details_raw', ''))
             education_summary_raw = str(resume_analysis.get('education_summary_raw', resume_analysis.get('education', '')))
-
-            # 1. User's Name (from resume analysis)
             user_name_from_resume = "the student"
             name_match_rag = re.search(r"candidate's name is ([A-Za-z\s\.]+)\.", contact_details_raw, re.IGNORECASE)
             if name_match_rag:
                 user_name_from_resume = name_match_rag.group(1).strip()
             elif resume_analysis.get('candidate_name_from_resume') and resume_analysis['candidate_name_from_resume'] not in ["Unknown", "the student"]:
                  user_name_from_resume = resume_analysis['candidate_name_from_resume']
-            logger.info(f"Using candidate name from resume: {user_name_from_resume}")
 
-            # 2. User's University (from resume analysis)
             user_university_from_resume = "[User's University from Resume]"
-            # More robust regex for university: looks for institution names before common delimiters
             uni_match_rag = re.search(
                 r"^(.*?)(?:Degree:|Bachelor of|Diploma of|Expected Graduation:|CGPA:|GPA:|,?\s*(?:Mumbai|India|Maharashtra|Arizona|Stanford|Cambridge|MIT|Harvard|Berkeley|USA|UK))",
                 education_summary_raw, re.IGNORECASE | re.DOTALL
             )
             if uni_match_rag:
                 parsed_uni = uni_match_rag.group(1).strip()
-                # Clean up common RAG prefixes
                 if parsed_uni.lower().startswith("the candidate has the following education:"):
                     parsed_uni = parsed_uni[len("the candidate has the following education:"):].strip()
-                if parsed_uni.lower().startswith("summarize the candidate's education"): # Another possible prefix
+                if parsed_uni.lower().startswith("summarize the candidate's education"):
                     parsed_uni = parsed_uni[len("summarize the candidate's education"):].strip()
-                if parsed_uni and len(parsed_uni) > 5 and not parsed_uni.lower().startswith("answer:"): # Basic sanity check
+                if parsed_uni and len(parsed_uni) > 5 and not parsed_uni.lower().startswith("answer:"):
                     user_university_from_resume = parsed_uni
             elif resume_analysis.get('university_from_resume') and resume_analysis['university_from_resume'] not in ["Unknown", "[User's University from Resume]"]:
                 user_university_from_resume = resume_analysis['university_from_resume']
-            logger.info(f"Using candidate university from resume: {user_university_from_resume}")
-
-            # Extract user's email
+            
             user_email_from_resume = None
             email_match_rag = re.search(r"Email:\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", contact_details_raw, re.IGNORECASE)
             if email_match_rag:
                 user_email_from_resume = email_match_rag.group(1).strip()
             elif resume_analysis.get('email_from_resume'):
                 user_email_from_resume = resume_analysis['email_from_resume']
-            logger.info(f"Using candidate email from resume: {user_email_from_resume}")
-
-            # Extract user's phone with more robust pattern matching
+            
             user_phone_from_resume = None
             phone_match_rag = re.search(r"Phone:\s*(\+?[0-9\s\-\(\)]{7,})", contact_details_raw, re.IGNORECASE)
             if phone_match_rag:
                 user_phone_from_resume = phone_match_rag.group(1).strip()
             elif resume_analysis.get('phone_from_resume'):
                 user_phone_from_resume = resume_analysis['phone_from_resume']
-            logger.info(f"Using candidate phone from resume: {user_phone_from_resume}")
-
-            # Prepare signature block with consistent formatting
+            
             signature_lines = ["Sincerely,", "", user_name_from_resume]
             if user_email_from_resume:
-                signature_lines.append(f"Email: {user_email_from_resume}")  # Add "Email:" prefix
+                signature_lines.append(f"Email: {user_email_from_resume}")
             if user_phone_from_resume:
-                signature_lines.append(f"Phone: {user_phone_from_resume}")  # Add "Phone:" prefix
+                signature_lines.append(f"Phone: {user_phone_from_resume}")
             signature_block = "\n".join(signature_lines)
 
-            # Generate email prompt with explicit signature instructions
-            prompt = f"""
-            You are an expert academic email writer. Generate a professional and personalized academic email.
+            # --- MODIFICATION: Dynamic prompt generation based on fallback status ---
+            is_fallback = professor_data.get("is_fallback", False)
+            prompt = ""
 
-            User Profile Information:
-            Name: {user_name_from_resume}
-            University: {user_university_from_resume or '[University not found in resume]'}
-            Email: {user_email_from_resume}
-            Phone: {user_phone_from_resume}
-            Full User Profile:
-            {json.dumps(user_data, indent=2, default=str)}
+            if is_fallback:
+                logger.info(f"Using fallback email prompt for {professor_data.get('name')}.")
+                prompt = f"""
+                You are an expert academic email writer. Generate a professional and personalized academic email.
+                The full profile for the professor was not available, so you must rely on their general 'About' information.
 
-            Professor Profile:
-            {json.dumps(professor_data, indent=2, default=str)}
+                User Profile Information (from Resume Analysis):
+                Name: {user_name_from_resume}
+                University: {user_university_from_resume or '[University not found in resume]'}
+                Full User Profile:
+                {json.dumps(user_data, indent=2, default=str)}
 
-            Task: Write an email expressing interest in research and potential internship opportunities.
+                Professor Information (Summary):
+                Name: {professor_data.get('name')}
+                About: {" ".join(professor_data.get('research_interests', ['No specific information available.']))}
 
-            Critical Instructions:
-            1. Use EXACTLY this signature block at the end (do not modify it):
-            {signature_block}
+                Task: Write a personalized email expressing interest in the professor's work and potential research opportunities.
+                You MUST connect the student's skills and projects (from their resume analysis) with the professor's known area of expertise.
+
+                Critical Instructions:
+                1. Use EXACTLY this signature block at the end (do not modify it):
+                {signature_block}
+                2. Keep the email professional, focused, and approximately 300-350 words.
+                3. DO NOT add any additional contact information beyond what is in the signature block.
+
+                Output Format (Return ONLY valid JSON):
+                {{
+                    "subject": "Seeking Research Volunteer Opportunity - {user_name_from_resume}",
+                    "body": "The email content here... [must end with the exact signature block provided]"
+                }}
+                """
+            else:
+                logger.info(f"Using standard email prompt for {professor_data.get('name')}.")
+                prompt = f"""
+                You are an expert academic email writer. Generate a professional and personalized academic email.
+
+                User Profile Information:
+                Name: {user_name_from_resume}
+                University: {user_university_from_resume or '[University not found in resume]'}
+                Full User Profile:
+                {json.dumps(user_data, indent=2, default=str)}
+
+                Professor Profile:
+                {json.dumps(professor_data, indent=2, default=str)}
+
+                Task: Write an email expressing interest in research and potential internship opportunities.
+
+                Critical Instructions:
+                1. Use EXACTLY this signature block at the end (do not modify it):
+                {signature_block}
+                2. Keep the email professional, focused, and approximately 300-350 words.
+                3. Reference specific areas of the professor's research and recent publications that align with the student's background.
+                4. DO NOT add any additional contact information beyond what is in the signature block.
+
+                Output Format (Return ONLY valid JSON):
+                {{
+                    "subject": "Seeking Research Volunteer Opportunity - [Relevant Research Area] - {user_name_from_resume}",
+                    "body": "The email content here... [must end with the exact signature block provided]"
+                }}
+                """
             
-            2. Keep the email professional, focused, and approximately 300-350 words.
-            3. Reference specific areas of the professor's research that align with the student's background.
-            4. DO NOT add any additional contact information beyond what is in the signature block.
-
-            Output Format (Return ONLY valid JSON):
-            {{
-                "subject": "Research Internship Inquiry - [Research Area] - {user_name_from_resume}",
-                "body": "The email content here... [must end with the exact signature block provided]"
-            }}
-            """
-
             logger.info("Calling Gemini API to generate email...")
             model = genai.GenerativeModel(MODEL_NAME)
-            
-            # Configure generation parameters directly in generate_content
             response = model.generate_content(
                 prompt,
                 generation_config={
@@ -507,88 +531,103 @@ class EmailAgentSystem:
             if not response or not hasattr(response, 'text'):
                 raise ValueError("Failed to generate email content or received empty response from LLM.")
 
-            response_text = response.text.strip() #
+            response_text = response.text.strip()
             logger.debug(f"Raw LLM response: {response_text[:300]}...")
 
             try:
-                # Clean the response if it contains markdown code fences
                 if response_text.startswith("```json"):
-                    response_text = response_text[7:-3].strip() #
+                    response_text = response_text[7:-3].strip()
                 elif response_text.startswith("```"):
-                    response_text = response_text[3:-3].strip() #
-
-                email_data = json.loads(response_text) #
+                    response_text = response_text[3:-3].strip()
+                email_data = json.loads(response_text)
             except json.JSONDecodeError as je:
-                logger.error(f"LLM response is not valid JSON. Error: {je}. Response text: {response_text}") #
+                logger.error(f"LLM response is not valid JSON. Error: {je}. Response text: {response_text}")
                 if "Subject:" in response_text and "Body:" in response_text:
-                    logger.warning("Attempting to parse Subject/Body from non-JSON LLM response as a fallback.") #
+                    logger.warning("Attempting to parse Subject/Body from non-JSON LLM response as a fallback.")
                     subject_match = re.search(r"Subject:\s*(.+)", response_text, re.IGNORECASE)
-                    # Ensure Body captures multi-line content and stops before any potential post-body text if LLM adds extra.
                     body_match = re.search(r"Body:\s*((?:.|\n)+)", response_text, re.IGNORECASE)
                     if subject_match and body_match:
                         email_data = {"subject": subject_match.group(1).strip(), "body": body_match.group(1).strip()}
                     else:
-                        raise ValueError(f"LLM did not return valid JSON and fallback parsing failed. Response: {response_text}") #
+                        raise ValueError(f"LLM did not return valid JSON and fallback parsing failed. Response: {response_text}")
                 else:
-                    raise ValueError(f"LLM did not return valid JSON. Response: {response_text}") #
+                    raise ValueError(f"LLM did not return valid JSON. Response: {response_text}")
 
             if not isinstance(email_data, dict) or 'subject' not in email_data or 'body' not in email_data:
-                logger.error(f"LLM response missing 'subject' or 'body': {email_data}") #
-                raise ValueError("LLM response missing 'subject' or 'body' fields after parsing.") #
+                raise ValueError("LLM response missing 'subject' or 'body' fields after parsing.")
 
-            word_count = len(email_data['body'].split()) #
-            logger.info(f"Generated email - Subject: {email_data['subject']}") #
-            logger.info(f"Email body word count: {word_count}") #
-            if not (250 <= word_count <= 450): # Relaxed word count
-                logger.warning(f"Email body word count ({word_count}) outside typical range (300-350).") #
+            word_count = len(email_data['body'].split())
+            logger.info(f"Generated email - Subject: {email_data['subject']}")
+            logger.info(f"Email body word count: {word_count}")
 
-            return email_data #
+            return email_data
         except Exception as e:
-            logger.error(f"Error generating email: {str(e)}", exc_info=True) #
-            return {"error": f"Exception in email generation: {str(e)}"} #
+            logger.error(f"Error generating email: {str(e)}", exc_info=True)
+            return {"error": f"Exception in email generation: {str(e)}"}
         
     async def generate_personalized_email(self) -> Dict:
-        """Generate personalized emails for selected professors."""
+        """
+        Generate personalized emails for selected professors.
+        Uses fallback logic if a professor's detailed file is not found.
+        """
         try:
             user_id = self.session_state.get('user_id')
             if not user_id:
                 logger.error("User ID not found in session state for email generation.")
-                return {
-                    'status': 'error',
-                    'error': "User ID not found in session state"
-                }
+                return {'status': 'error', 'error': "User ID not found in session state"}
             
             selected_professors = self.session_state.get('selected_professors', [])
             if not selected_professors:
                 logger.warning("No professors selected for email generation.")
-                return {
-                    'status': 'error',
-                    'error': "No professors selected"
-                }
+                return {'status': 'error', 'error': "No professors selected"}
 
             results = {}
-            for professor_name in selected_professors:
-                try:
-                    # First, fetch the required data directly
-                    user_data = await self._fetch_user_data(user_id)
-                    professor_data = await self._fetch_professor_data(professor_name)
+            user_data = await self._fetch_user_data(user_id)
+            if "error" in user_data:
+                logger.error(f"Failed to fetch user data for {user_id}, aborting email generation.")
+                return {
+                    'status': 'error',
+                    'error': f"Failed to fetch user data: {user_data['error']}"
+                }
 
-                    # Check if we got valid data
-                    if "error" in user_data:
-                        results[professor_name] = {
-                            'status': 'error',
-                            'error': f"Failed to fetch user data: {user_data['error']}"
-                        }
+            for professor in selected_professors:
+                try:
+                    # Handle both string and dictionary professor entries
+                    if isinstance(professor, str):
+                        professor_name = professor
+                        professor_about = None
+                    elif isinstance(professor, dict):
+                        professor_name = professor.get("name") or professor.get("Name")
+                        professor_about = professor.get("about") or professor.get("About")
+                    else:
+                        logger.warning(f"Invalid professor entry type {type(professor)}, skipping")
                         continue
 
+                    if not professor_name:
+                        logger.warning(f"Skipping entry missing professor name: {professor}")
+                        continue
+
+                    # Fetch professor data from file
+                    professor_data = await self._fetch_professor_data(professor_name)
+
+                    # Handle fallback case where file is not found
+                    if professor_data is None:
+                        fallback_about = professor_about or "No additional information available."
+                        logger.warning(f"Creating fallback profile for {professor_name}")
+                        professor_data = {
+                            "name": professor_name,
+                            "research_interests": [f"Area of expertise: {fallback_about}"],
+                            "is_fallback": True
+                        }
+                    
                     if "error" in professor_data:
                         results[professor_name] = {
                             'status': 'error',
-                            'error': f"Failed to fetch professor data: {professor_data['error']}"
+                            'error': f"Failed to process professor data: {professor_data['error']}"
                         }
                         continue
 
-                    # Now generate the email with the collected data
+                    # Generate email with collected data
                     email_result = await self._generate_email(user_data, professor_data)
                     
                     if "error" in email_result:
@@ -636,36 +675,61 @@ class EmailAgentSystem:
 
 
 async def main_test():
+    """
+    Updated test function to demonstrate both standard and fallback email generation.
+    """
+    # --- MODIFICATION: Updated session state to include 'about' and a professor who will trigger the fallback ---
     mock_session_state = {
         'user_id': 'test_user_123',
-        'selected_professors': ["Dr. Ada Lovelace", "Professor Charles Babbage"],
+        'selected_professors': [
+            {
+                "name": "Dr. Ada Lovelace",
+                "about": "Pioneer of computational theory and analytical engines."
+            },
+            {
+                "name": "Professor Charles Babbage",
+                "about": "Inventor and mechanical engineer who designed the Difference Engine."
+            },
+            {
+                "name": "Dr. Grace Hopper", # This professor will not have a JSON file to test the fallback.
+                "about": "A computer science pioneer and naval officer, known for developing the first compiler."
+            }
+        ],
     }
 
     if os.getenv("MONGODB_URI"):
         try:
             client = MongoClient(os.getenv("MONGODB_URI"))
             db = client['ask_my_prof']
-            if not db.user_profiles.find_one({'user_id': 'test_user_123'}):
-                db.user_profiles.insert_one({
+            # Using update_one with upsert=True is more robust than find_one/insert_one
+            db.user_profiles.update_one(
+                {'user_id': 'test_user_123'},
+                {'$set': {
                     'user_id': 'test_user_123',
                     'name': 'Test User',
                     'email': 'test.user@example.com',
                     'university': 'Test University',
                     'resume_analysis': {
-                        'contact': {'phone': '123-456-7890', 'location': 'Test City, TS'},
-                        'skills': ['Python', 'AI', 'Machine Learning'],
-                        'projects': [{'title': 'AI Chatbot', 'description': 'Developed a chatbot.'}]
+                        'candidate_name_from_resume': 'Alex Doe',
+                        'email_from_resume': 'alex.doe@university.edu',
+                        'phone_from_resume': '123-456-7890',
+                        'university_from_resume': 'University of Innovation',
+                        'contact_details_raw': "candidate's name is Alex Doe. Email: alex.doe@university.edu. Phone: 123-456-7890",
+                        'education_summary_raw': "University of Innovation, Bachelor of Science. GPA: 3.8/4.0",
+                        'skills': ['Python', 'AI', 'Machine Learning', 'Data Analysis'],
+                        'projects': [{'title': 'AI Chatbot for Academic Research', 'description': 'Developed a chatbot using NLP to assist with literature reviews.'}]
                     },
                     'resume_link': 'https://example.com/resume_test_user.pdf'
-                })
-                logger.info("Inserted dummy user profile for test_user_123.")
+                }},
+                upsert=True
+            )
+            logger.info("Upserted dummy user profile for test_user_123.")
             client.close()
         except Exception as e:
             logger.error(f"Could not set up dummy user data: {e}")
     else:
         logger.warning("MONGODB_URI not set. Cannot create dummy user data.")
 
-    # Fix path to match structure expected by _fetch_professor_data
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     scrapper_output_dir = os.path.join(base_dir, 'backend', 'scrapper', 'output')
     os.makedirs(scrapper_output_dir, exist_ok=True)
@@ -675,10 +739,7 @@ async def main_test():
         "university": "University of Analytics",
         "department": "Computer Science",
         "research_interests": ["Analytical Engines", "Computational Theory", "Symbolic AI"],
-        "recent_publications": [
-            {"title": "Notes on the Analytical Engine", "year": 1843},
-            {"title": "Future of Computing Machines", "year": 1840}
-        ],
+        "recent_publications": [{"title": "Notes on the Analytical Engine", "year": 1843}],
         "email": "ada.lovelace@uanalytics.edu"
     }
     prof2_data = {
@@ -690,15 +751,12 @@ async def main_test():
     }
     
     try:
-        prof1_file = os.path.join(scrapper_output_dir, 'dr_ada_lovelace.json')
-        prof2_file = os.path.join(scrapper_output_dir, 'professor_charles_babbage.json')
-        
-        with open(prof1_file, 'w') as f:
+        with open(os.path.join(scrapper_output_dir, 'dr_ada_lovelace.json'), 'w') as f:
             json.dump(prof1_data, f, indent=2)
-        with open(prof2_file, 'w') as f:
+        with open(os.path.join(scrapper_output_dir, 'professor_charles_babbage.json'), 'w') as f:
             json.dump(prof2_data, f, indent=2)
         logger.info(f"Created test professor data files in {scrapper_output_dir}")
-        logger.info(f"Files created: {os.listdir(scrapper_output_dir)}")
+        # Note: We are intentionally NOT creating a file for Dr. Grace Hopper to test the fallback.
     except Exception as e:
         logger.error(f"Could not create professor data files: {e}", exc_info=True)
 
@@ -731,3 +789,9 @@ async def main_test():
     finally:
         if email_system:
             email_system.close_connections()
+
+if __name__ == '__main__':
+    # To run this test, ensure you have a .env file with GOOGLE_API_KEY and MONGODB_URI
+    # and you have installed the necessary libraries (google-generativeai, pymongo, python-dotenv, google-adk).
+    # This check prevents the script from running automatically if imported elsewhere.
+    asyncio.run(main_test())
