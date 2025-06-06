@@ -97,7 +97,7 @@ PLAYWRIGHT_PROXY_CONFIG = {
 
 
 # --- Content Validation Thresholds ---
-MIN_CONTENT_LENGTH = 150 # Minimum characters expected in combined *cleaned* sections
+MIN_CONTENT_LENGTH = 50 # Minimum characters expected in combined *cleaned* sections
 # Sections that trigger a *warning* if missing, but don't stop processing if length > MIN_CONTENT_LENGTH
 REQUIRED_SECTIONS = ['personal_background', 'research_focus', 'publications']
 
